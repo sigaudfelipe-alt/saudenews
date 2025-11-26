@@ -1,77 +1,97 @@
 import feedparser
 from bs4 import BeautifulSoup
-import requests
 
 
 # Fontes organizadas por seção da newsletter
+# Deixei Brasil & Operadoras bem mais focado em saúde / SUS / operadoras
 RSS_SOURCES = {
-    # Foco: Operadoras, hospitais, laboratórios e negócios de saúde no Brasil
     "brasil_operadoras": [
-        # Jornais / negócios – vamos filtrar por palavras de saúde
-        "https://www.estadao.com.br/rss",
-        "https://feeds.folha.uol.com.br/emcimadahora/rss091.xml",
+        # Ministério da Saúde / SUS / ANS / Governo
+        "https://www.gov.br/saude/pt-br/assuntos/noticias/@@rss.xml",
+        "https://www.gov.br/ans/pt-br/assuntos/noticias-ans/@@rss.xml",
+        # Agência Brasil – Saúde
+        "https://agenciabrasil.ebc.com.br/rss/saude.xml",
+        # Especializados em saúde no Brasil
+        "https://medicinasa.com.br/feed/",
+        "https://healthcare.grupomidia.com/feed/",
+        "https://saudedigitalnews.com.br/feed/",
+        # Jornais / negócios – ainda permitidos, mas filtrados por palavras de operadoras/SUS
         "https://valor.globo.com/rss/",
         "https://oglobo.globo.com/rss.xml",
         "https://www.braziljournal.com/feed/",
         "https://neofeed.com.br/feed/",
         "https://pipelinevalor.globo.com/rss/",
-        # Especializados em saúde no Brasil
-        "https://medicinasa.com.br/feed/",
-        "https://healthcare.grupomidia.com/feed/",
-        "https://saudedigitalnews.com.br/feed/",
     ],
 
-    # Foco: sistemas de saúde, políticas, saúde global
     "mundo_saude_global": [
+        # Saúde global / sistemas de saúde / política pública
         "https://rss.nytimes.com/services/xml/rss/nyt/Health.xml",
         "https://www.who.int/feeds/entity/mediacentre/news/en/rss.xml",
     ],
 
-    # Foco: healthtechs, digital health, inovação em saúde
     "healthtechs": [
+        # Inovação, digital health, healthtechs
         "https://techcrunch.com/feed/",
         "https://www.businessinsider.com/sai/rss",
     ],
 
-    # Foco: wellness, bem-estar, saúde mental, lifestyle (principalmente EUA/Europa)
     "wellness": [
+        # Bem-estar, saúde mental, hábitos de vida
         "https://rss.nytimes.com/services/xml/rss/nyt/Well.xml",
     ],
 }
 
 
-# Palavras-chave principais de SAÚDE (operadoras, hospitais, labs, SUS, etc.)
+# Palavras-chave para SAÚDE em geral (português/inglês)
 HEALTH_KEYWORDS_PT = [
     "saúde", "hospital", "hospitais", "clínica", "clínicas",
     "laboratório", "laboratórios", "diagnóstico", "exame",
-    "plano de saúde", "planos de saúde", "operadora", "operadoras",
-    "beneficiário", "beneficiários", "ans", "sus",
-    "pronto-socorro", "urgência", "emergência",
-    "oncologia", "cardiologia", "uti", "internação",
-    "rede credenciada", "convênio médico",
+    "vacina", "vacinas", "tratamento", "doença", "doenças",
+    "oncologia", "câncer", "cardiologia", "uti", "internação",
+    "unidade básica de saúde", "ubs", "upas", "atenção primária",
 ]
 
 HEALTH_KEYWORDS_EN = [
     "health", "healthcare", "hospital", "clinic", "clinics",
-    "insurer", "insurance", "payer", "medicare", "medicaid",
-    "pharma", "biotech", "drug", "drugs", "diagnostic",
-    "telehealth", "telemedicine",
+    "diagnostic", "diagnostics", "disease", "diseases",
+    "vaccine", "vaccines", "treatment",
 ]
 
-# Palavras extras para filtrar HEALTHTECH
+# Palavras específicas pra OPERADORAS / PLANOS / SUS / HOSPITAIS / LABS
+BR_OPERADORAS_KEYWORDS = [
+    "plano de saúde", "planos de saúde", "plano de saude", "planos de saude",
+    "operadora", "operadoras", "seguro saúde", "seguro-saúde", "seguro saude",
+    "convênio médico", "convenio médico", "convenio medico",
+    "coparticipação", "coparticipacao",
+    "ans", "agência nacional de saúde suplementar",
+    "sus", "sistema único de saúde",
+    "rede credenciada", "rede própria", "rede própria de hospitais",
+    "hospitais filantrópicos", "hospital filantrópico",
+    # nomes de players e grupos de saúde (pode ir afinando)
+    "unimed", "hapvida", "notredame", "amil", "bradesco saúde",
+    "sulamérica saúde", "sulamerica saúde", "sulamerica saude",
+    "rede d'or", "rede dor", "dasa", "fleury", "oncoclínicas", "oncoclinicas",
+    "laboratório clínico", "laboratorio clínico", "laboratorio clinico",
+]
+
+# Palavras extras para HEALTHTECH
 HEALTHTECH_EXTRA = [
     "digital health", "healthtech", "health tech", "e-health",
-    "telemedicina", "telemedicina", "teleconsulta",
-    "wearable", "fitness app", "remote patient monitoring",
-    "ai in healthcare", "ia na saúde",
+    "telemedicina", "teleconsulta", "teleconsulta", "telehealth", "telemedicine",
+    "prontuário eletrônico", "prontuario eletronico", "rpm", "remote patient monitoring",
+    "ai in healthcare", "ia na saúde", "inteligência artificial na saúde",
 ]
 
-# Palavras para WELLNESS / bem-estar
+# Palavras pra WELLNESS / bem-estar
 WELLNESS_KEYWORDS = [
-    "wellness", "bem-estar", "saúde mental", "ansiedade",
-    "depressão", "sono", "sleep", "mindfulness", "meditação",
-    "burnout", "stress", "estresse", "atividade física",
-    "exercício", "lifestyle",
+    "wellness", "bem-estar", "bem estar",
+    "saúde mental", "saude mental",
+    "ansiedade", "depressão", "depressao",
+    "sono", "sleep", "insônia", "insonia",
+    "mindfulness", "meditação", "meditacao",
+    "burnout", "stress", "estresse",
+    "atividade física", "atividade fisica", "exercício", "exercicio",
+    "lifestyle",
 ]
 
 
@@ -87,24 +107,41 @@ def _clean_summary(raw_summary: str) -> str:
 
 
 def is_relevant(section: str, title: str, summary: str) -> bool:
-    """Decide se a notícia é relevante para saúde/healthtech/wellness."""
+    """Decide se a notícia é relevante para cada seção."""
     text = f"{title} {summary}".lower()
 
-    # Base de saúde geral
-    health_keywords = HEALTH_KEYWORDS_PT + HEALTH_KEYWORDS_EN
+    # Seção Brasil – Saúde & Operadoras:
+    # bem mais restrita: precisa bater em SUS/operadoras/hospitais/labs
+    if section == "brasil_operadoras":
+        return any(k in text for k in BR_OPERADORAS_KEYWORDS)
 
+    # Healthtechs: base de saúde + termos de tech
     if section == "healthtechs":
-        keywords = health_keywords + HEALTHTECH_EXTRA
-    elif section == "wellness":
-        keywords = WELLNESS_KEYWORDS
-    else:
-        # brasil_operadoras e mundo_saude_global
-        keywords = health_keywords
+        base = HEALTH_KEYWORDS_EN + HEALTH_KEYWORDS_PT + HEALTHTECH_EXTRA
+        return any(k in text for k in base)
 
-    return any(k in text for k in keywords)
+    # Wellness: bem-estar/saúde mental
+    if section == "wellness":
+        return any(k in text for k in WELLNESS_KEYWORDS)
+
+    # Mundo – Saúde Global: sistemas de saúde / seguro / políticas
+    if section == "mundo_saude_global":
+        global_keywords = (
+            HEALTH_KEYWORDS_EN
+            + [
+                "health insurance",
+                "insurance premiums",
+                "medicare", "medicaid",
+                "universal health coverage",
+                "universal health care",
+            ]
+        )
+        return any(k in text for k in global_keywords)
+
+    return False
 
 
-def fetch_rss(url: str, section: str, max_items: int = 15):
+def fetch_rss(url: str, section: str, max_items: int = 20):
     """Busca itens de um feed RSS, filtra por relevância e devolve dicionários básicos."""
     try:
         feed = feedparser.parse(url)
@@ -119,7 +156,6 @@ def fetch_rss(url: str, section: str, max_items: int = 15):
             if not title or not link:
                 continue
 
-            # Aplica filtro de relevância por seção
             if not is_relevant(section, title, summary):
                 continue
 
@@ -150,6 +186,6 @@ def fetch_all_news():
         section_items = []
         for url in urls:
             section_items.extend(fetch_rss(url, section_key))
-        # Deixa cada seção enxuta
+        # Mantém cada seção enxuta, com itens relevantes
         all_news[section_key] = section_items[:20]
     return all_news
