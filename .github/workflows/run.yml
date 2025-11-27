@@ -22,20 +22,19 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Run script
+          - name: Run script
         env:
           # Brevo (API v3)
           BREVO_API_KEY: ${{ secrets.BREVO_API_KEY }}
           BREVO_SENDER_EMAIL: ${{ secrets.BREVO_SENDER_EMAIL }}
           BREVO_SENDER_NAME: ${{ secrets.BREVO_SENDER_NAME }}
+          BREVO_LIST_ID: ${{ secrets.BREVO_LIST_ID }}
 
-          # Destinatários:
-          # - Se for disparo manual (workflow_dispatch) → usa TO_EMAILS_MANUAL (só você)
-          # - Se for execução diária agendada          → usa TO_EMAILS (lista completa)
-          TO_EMAILS: ${{ github.event_name == 'workflow_dispatch' && secrets.TO_EMAILS_MANUAL || secrets.TO_EMAILS }}
+          # E-mail(s) para teste manual (Run workflow)
+          TO_EMAILS_MANUAL: ${{ secrets.TO_EMAILS_MANUAL }}
 
-          # Beehiiv (opcional – se quiser manter para futuro; hoje dá SEND_API_DISABLED)
-          BEEHIIV_API_KEY: ${{ secrets.BEEHIIV_API_KEY }}
-          BEEHIIV_PUBLICATION_ID: ${{ secrets.BEEHIIV_PUBLICATION_ID }}
+          # Modo de execução: 'workflow_dispatch' (manual) ou 'schedule' (cron)
+          RUN_MODE: ${{ github.event_name }}
 
         run: python src/main.py
+
