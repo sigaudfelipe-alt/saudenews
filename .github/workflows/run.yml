@@ -9,8 +9,10 @@ on:
 jobs:
   run:
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -22,13 +24,18 @@ jobs:
 
       - name: Run script
         env:
-          FROM_EMAIL: ${{ secrets.FROM_EMAIL }}
-          EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
-          # Regra: se for disparo manual, manda só para você (TO_EMAILS_MANUAL).
-          # Se for execução diária agendada, usa TO_EMAILS com todos os destinatários.
+          # Brevo (API v3)
+          BREVO_API_KEY: ${{ secrets.BREVO_API_KEY }}
+          BREVO_SENDER_EMAIL: ${{ secrets.BREVO_SENDER_EMAIL }}
+          BREVO_SENDER_NAME: ${{ secrets.BREVO_SENDER_NAME }}
+
+          # Destinatários:
+          # - Se for disparo manual (workflow_dispatch) → usa TO_EMAILS_MANUAL (só você)
+          # - Se for execução diária agendada          → usa TO_EMAILS (lista completa)
           TO_EMAILS: ${{ github.event_name == 'workflow_dispatch' && secrets.TO_EMAILS_MANUAL || secrets.TO_EMAILS }}
-          SMTP_SERVER: ${{ secrets.SMTP_SERVER }}
-          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+
+          # Beehiiv (opcional – se quiser manter para futuro; hoje dá SEND_API_DISABLED)
           BEEHIIV_API_KEY: ${{ secrets.BEEHIIV_API_KEY }}
           BEEHIIV_PUBLICATION_ID: ${{ secrets.BEEHIIV_PUBLICATION_ID }}
+
         run: python src/main.py
