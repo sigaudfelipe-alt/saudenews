@@ -4,7 +4,6 @@ from zoneinfo import ZoneInfo
 from news_fetcher import fetch_all_news
 from render_news import render_news_html
 from send_email import send_newsletter_email
-from post_to_beehiiv import post_to_beehiiv
 
 
 def main():
@@ -14,14 +13,12 @@ def main():
         print("Hoje não é dia útil (segunda a sexta). Newsletter não será enviada.")
         return
 
+    # Busca notícias e monta HTML
     news = fetch_all_news()
     html = render_news_html(news)
 
-    # 1) Envia por e-mail
+    # Envia via Brevo (implementado em send_email.py)
     send_newsletter_email("Principais notícias de Saúde – Brasil e Mundo", html)
-
-    # 2) Cria post na Beehiiv (rascunho)
-    post_to_beehiiv(html)
 
 
 if __name__ == "__main__":
