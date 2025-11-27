@@ -1,32 +1,62 @@
-import smtplib
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
 import os
+import requests
 
 
-def send_newsletter_email(subject, html_content):
-    """Envia a newsletter por e-mail usando SMTP (Gmail por padrão)."""
-    from_addr = os.getenv("FROM_EMAIL")
-    password = os.getenv("EMAIL_PASSWORD")
+def send_newsletter_email(subject: str, html_content: str):
+    """
+    Envia a newsletter usando a API v3 da Brevo (Sendinblue).
+
+    Docs base:
+    - https://developers.brevo.com/reference/sendtransacemail
+    """
+
+    api_key = os.getenv("BREVO_API_KEY")
+    sender_email = os.getenv("BREVO_SENDER_EMAIL")
+    sender_name = os.getenv("BREVO_SENDER_NAME", "News Saúde")
     to_emails_raw = os.getenv("TO_EMAILS", "")
 
-    if not from_addr or not password or not to_emails_raw:
-        raise ValueError("FROM_EMAIL, EMAIL_PASSWORD ou TO_EMAILS não configurados nos secrets.")
+    if not api_key or not sender_email or not to_emails_raw:
+        raise ValueError(
+            "Faltam BREVO_API_KEY, BREVO_SENDER_EMAIL ou TO_EMAILS nos secrets."
+        )
 
-    to_list = [e.strip() for e in to_emails_raw.split(",") if e.strip()]
+    # Constrói a lista de destinatários a partir da string TO_EMAILS
+    to_list = [
+        {"email": e.strip()}
+        for e in to_emails_raw.split(",")
+        if e.strip()
+    ]
 
-    msg = MIMEMultipart("alternative")
-    msg["Subject"] = subject
-    msg["From"] = from_addr
-    msg["To"] = ", ".join(to_list)
+    if not to_list:
+        raise ValueError("TO_EMAILS está vazio depois do parse.")
 
-    msg.attach(MIMEText(html_content, "html", "utf-8"))
+    payload = {
+        "sender": {"email": sender_email, "name": sender_name},
+        "to": to_list,
+        "subject": subject,
+        "htmlContent": html_content,
+    }
 
-    smtp_server = os.getenv("SMTP_SERVER", "smtp.gmail.com")
-    smtp_port = int(os.getenv("SMTP_PORT", "587"))
+    headers = {
+        "api-key": api_key,
+        "Content-Type": "application/json",
+        "accept": "application/json",
+    }
 
-    server = smtplib.SMTP(smtp_server, smtp_port)
-    server.starttls()
-    server.login(from_addr, password)
-    server.sendmail(from_addr, to_list, msg.as_string())
-    server.quit()
+    try:
+        resp = requests.post(
+            "https://api.brevo.com/v3/smtp/email",
+            json=payload,
+            headers=headers,
+            timeout=30,
+        )
+        resp.raise_for_status()
+        print("E-mail enviado via Brevo com sucesso. Status:", resp.status_code)
+    except Exception as e:
+        # Log simples para aparecer no GitHub Actions
+        print("Falha ao enviar e-mail via Brevo:", e)
+        try:
+            print("Resposta da Brevo:", resp.status_code, resp.text)
+        except Exception:
+            pass
+        raise
