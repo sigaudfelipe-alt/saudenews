@@ -4,7 +4,7 @@ from datetime import date
 SECTION_META = {
     "brasil_operadoras": {
         "title": "Brasil – Saúde & Operadoras",
-        "subtitle": "Operadoras & SUS",
+        "subtitle": "Operadoras • SUS • Hospitais • Laboratórios",
         "tag": "BRASIL",
         "emoji": "",
     },
@@ -16,7 +16,7 @@ SECTION_META = {
     },
     "healthtechs": {
         "title": "🚀 Healthtechs – Brasil e Mundo",
-        "subtitle": "Inovação • Startups & VC",
+        "subtitle": "Inovação • Startups & Digital Health",
         "tag": "🚀 HEALTHTECHS",
         "emoji": "🚀",
     },
@@ -51,31 +51,31 @@ def render_news_html(news):
     today_str = date.today().strftime("%d/%m/%Y")
     top_5 = build_top_5(news)
 
-    html = f"""    <html>
+    html = f"""
+    <html>
     <body style="font-family: Arial, sans-serif; background:#f5f5f5; padding:20px;">
       <div style="max-width:800px; margin:0 auto; background:white; padding:24px; border-radius:12px;">
-    
+
         <h1 style="margin-top:0; color:#111111; font-size:26px;">
           Principais notícias de Saúde – Brasil e Mundo
         </h1>
-        <p style="color:#555555; font-size:14px;">
+        <p style="color:#555555; font-size:14px; margin-top:-10px;">
           Curadoria diária • {today_str}
         </p>
-    
+
         <p style="color:#333333; line-height:1.5; font-size:14px;">
           Nas últimas 24 horas, o setor de saúde ganhou tração com movimentos em operadoras,
-          hospitais, planos de saúde e healthtechs, além de discussões sobre sustentabilidade
-          dos sistemas de saúde e tendências de bem-estar e saúde mental nos Estados Unidos
-          e Europa.
+          hospitais, planos de saúde, laboratórios e healthtechs — além de temas de
+          sustentabilidade dos sistemas públicos e tendências de bem-estar e saúde mental.
         </p>
-    
+
         <h2 style="margin-top:24px; font-size:18px;">🧠 RESUMO DO DIA (IA)</h2>
         <p style="color:#333333; line-height:1.6; font-size:14px;">
-          Brasil & Operadoras • Saúde Global • Healthtechs & IA • Wellness EUA / Europa.
-          Use esta newsletter como radar rápido para identificar movimentos relevantes e temas
-          que podem impactar operadoras, hospitais, empregadores e o ecossistema de saúde.
+          Brasil & Operadoras • Saúde Global • Healthtechs & IA • Wellness EUA/Europa.
+          Use esta newsletter como radar rápido para captar movimentos que podem impactar
+          operadoras, hospitais, empregadores e todo o ecossistema de saúde.
         </p>
-    
+
         <h2 style="margin-top:28px; font-size:18px;">⭐ TOP 5 DO DIA</h2>
     """
 
@@ -88,7 +88,8 @@ def render_news_html(news):
             prefix = f"<b>{tag}</b> " if tag else ""
             title = item["title"]
             link = item["link"]
-            html += f"""            <li style="margin-bottom:6px;">
+            html += f"""
+            <li style="margin-bottom:6px;">
               {prefix}<a href="{link}" style="color:#1a73e8; text-decoration:none;">{title}</a>
             </li>
             """
@@ -99,10 +100,13 @@ def render_news_html(news):
         title = meta["title"]
         subtitle = meta.get("subtitle")
 
-        html += f"""        <h2 style="margin-top:28px; font-size:18px;">{title}</h2>
+        html += f"""
+        <h2 style="margin-top:28px; font-size:18px;">{title}</h2>
         """
+
         if subtitle:
-            html += f"""            <p style="margin-top:-4px; margin-bottom:10px; font-size:13px; color:#777777;">
+            html += f"""
+            <p style="margin-top:-4px; margin-bottom:10px; font-size:13px; color:#777777;">
               {subtitle}
             </p>
             """
@@ -116,26 +120,48 @@ def render_news_html(news):
             title = item["title"]
             link = item["link"]
             summary = item.get("summary", "")
-            html += f"""            <li style="margin-bottom:10px;">
+            html += f"""
+            <li style="margin-bottom:10px;">
               <a href="{link}" style="color:#1a73e8; text-decoration:none; font-weight:bold;">
                 {title}
               </a>
             """
             if summary:
-                html += f"""                  <br>
+                html += f"""
+                  <br>
                   <span style="font-size:13px; color:#555555;">{summary}</span>
                 """
             html += "</li>"
         html += "</ul>"
 
-    html += """        <hr style="margin-top:32px; border:none; border-top:1px solid #e0e0e0;">
+    # -------------------------------
+    # CTA para inscrição na newsletter
+    # -------------------------------
+
+    html += """
+        <hr style="margin-top:32px; border:none; border-top:1px solid #e0e0e0;">
         <p style="font-size:11px; color:#888888; line-height:1.4;">
           Curadoria automática com apoio de IA. Use esta newsletter como insumo estratégico, validando
           detalhes diretamente nas fontes originais quando necessário.
         </p>
+
+        <hr style="margin-top:24px; border:none; border-top:1px solid #e0e0e0;">
+
+        <p style="font-size:13px; color:#555555; margin-top:16px; margin-bottom:4px;">
+          💌 <b>Quer receber esta newsletter todos os dias às 9h?</b>
+        </p>
+        <p style="margin-top:0; margin-bottom:20px;">
+          <a href="https://0ce811e1.sibforms.com/serve/MUIFABmrR-vKsTfK8hyop_0K5PbZE6WYC3KqpaX_RjLAQbutDR5nNcfk0KtxQHGvCDp4QD26EWx-bjlypjL1gp5LDl-T0hKA-Unc6kd0igomqwe10xFyKMxoaHoO9-xI1dP1M_0Y24VRHRxEoY-cy9XX4Lg2qPnrR52kFuAolB_Ii2CLeYumVVSCjg_SkEUEPkx_hwFvk6YkTbFkZg=="
+             style="display:inline-block; background:#1a73e8; color:#ffffff; padding:10px 18px; border-radius:6px;
+                    text-decoration:none; font-size:13px; font-weight:bold;">
+            Inscreva-se na Newsletter de Saúde
+          </a>
+        </p>
+
       </div>
     </body>
     </html>
     """
 
     return html
+
