@@ -1,111 +1,128 @@
+"""
+Envio de e-mail da newsletter via Brevo (Sendinblue) API.
+
+Secrets usados (GitHub / ambiente):
+
+- BREVO_API_KEY       -> API Key da Brevo (obrigatório)
+- BREVO_SENDER_EMAIL  -> e-mail do remetente (obrigatório)
+- BREVO_SENDER_NAME   -> nome do remetente (obrigatório)
+
+Controle de destinatários:
+
+- TO_EMAILS           -> lista de e-mails (prod), separados por vírgula
+- TO_EMAILS_MANUAL    -> seu e-mail (ou poucos e-mails) para testes manuais
+
+Controle de ambiente:
+
+- NEWS_ENV:
+    - "prod" / "production"  -> usa TO_EMAILS
+    - qualquer outro valor   -> usa TO_EMAILS_MANUAL (fallback para TO_EMAILS)
+
+OBS: Secrets antigos de SMTP (SMTP_SERVER, SMTP_PORT, EMAIL_PASSWORD etc.)
+não são mais utilizados por este módulo.
+"""
+
+from __future__ import annotations
+
+import json
 import os
-import requests
+from typing import List
+from urllib.error import HTTPError, URLError
+from urllib.request import Request, urlopen
 
 
-def _get_contacts_from_brevo_list(api_key: str, list_id: str, limit: int = 500):
+BREVO_ENDPOINT = "https://api.brevo.com/v3/smtp/email"
+
+
+# ---------------------------------------------------------------------------
+# Helpers de ambiente
+# ---------------------------------------------------------------------------
+
+
+def _get_env(name: str, default: str | None = None, required: bool = False) -> str:
+    value = os.getenv(name, default)
+    if required and not value:
+        raise RuntimeError(f"Environment variable {name} is required but not set")
+    return value or ""
+
+
+def get_recipients() -> List[str]:
     """
-    Busca contatos da lista da Brevo via API v3.
-    Usa GET /contacts/lists/{listId}/contacts
+    Resolve a lista de destinatários com base em NEWS_ENV.
+
+    NEWS_ENV:
+      - "prod" / "production" -> TO_EMAILS
+      - qualquer outro valor  -> TO_EMAILS_MANUAL (fallback em TO_EMAILS)
+
+    Isso garante que, ao rodar manualmente com NEWS_ENV diferente de "prod",
+    o envio seja apenas para o seu e-mail (TO_EMAILS_MANUAL).
     """
-    url = f"https://api.brevo.com/v3/contacts/lists/{list_id}/contacts"
-    params = {
-        "limit": limit,
-        "offset": 0,
-        "sort": "asc",
-    }
-    headers = {
-        "api-key": api_key,
-        "accept": "application/json",
-    }
+    env = _get_env("NEWS_ENV", "manual").lower()
 
-    resp = requests.get(url, headers=headers, params=params, timeout=30)
-    resp.raise_for_status()
-    data = resp.json()
+    if env in {"prod", "production", "live"}:
+        raw = _get_env("TO_EMAILS", required=True)
+    else:
+        # modo manual / teste: usa TO_EMAILS_MANUAL
+        raw = _get_env("TO_EMAILS_MANUAL", _get_env("TO_EMAILS", ""), required=True)
 
-    contacts = data.get("contacts", [])
-    emails = []
-
-    for c in contacts:
-        email = c.get("email")
-        if email:
-            emails.append(email.strip())
-
+    emails = [e.strip() for e in raw.split(",") if e.strip()]
+    if not emails:
+        raise RuntimeError("No recipients resolved for newsletter")
     return emails
 
 
-def send_newsletter_email(subject: str, html_content: str):
+# ---------------------------------------------------------------------------
+# Envio via Brevo API
+# ---------------------------------------------------------------------------
+
+
+def send_email(subject: str, html_body: str) -> None:
     """
-    Envia a newsletter usando a API v3 da Brevo.
-
-    Regras:
-    - Se RUN_MODE == 'workflow_dispatch'  -> usa TO_EMAILS_MANUAL (teste só com você)
-    - Caso contrário (envio agendado)     -> busca todos os contatos da lista BREVO_LIST_ID
+    Envia a newsletter via Brevo (Sendinblue) API /smtp/email.
     """
+    api_key = _get_env("BREVO_API_KEY", required=True)
+    sender_email = _get_env("BREVO_SENDER_EMAIL", required=True)
+    sender_name = _get_env("BREVO_SENDER_NAME", required=True)
 
-    api_key = os.getenv("BREVO_API_KEY")
-    sender_email = os.getenv("BREVO_SENDER_EMAIL")
-    sender_name = os.getenv("BREVO_SENDER_NAME", "News Saúde")
-    run_mode = os.getenv("RUN_MODE", "schedule")
-    list_id = os.getenv("BREVO_LIST_ID")
+    recipients = get_recipients()
 
-    if not api_key or not sender_email:
-        raise ValueError("Faltam BREVO_API_KEY ou BREVO_SENDER_EMAIL nos secrets.")
-
-    # 1) Define destinatários
-    to_list = []
-
-    if run_mode == "workflow_dispatch":
-        # Modo teste manual: envia só para TO_EMAILS_MANUAL
-        to_emails_raw = os.getenv("TO_EMAILS_MANUAL", "")
-        to_list = [
-            {"email": e.strip()}
-            for e in to_emails_raw.split(",")
-            if e.strip()
-        ]
-        print(f"RUN_MODE=workflow_dispatch → {len(to_list)} destinatário(s) (TO_EMAILS_MANUAL).")
-    else:
-        # Modo agendado: busca todos da lista da Brevo
-        if not list_id:
-            raise ValueError("BREVO_LIST_ID não configurado nos secrets.")
-        try:
-            emails = _get_contacts_from_brevo_list(api_key, list_id)
-        except Exception as e:
-            print("Erro ao buscar contatos da lista da Brevo:", e)
-            raise
-        to_list = [{"email": e} for e in emails]
-        print(f"RUN_MODE=schedule → {len(to_list)} destinatário(s) da lista {list_id}.")
-
-    if not to_list:
-        print("Nenhum destinatário encontrado. E-mail não será enviado.")
-        return
-
-    # 2) Monta payload do e-mail
-    payload = {
-        "sender": {"email": sender_email, "name": sender_name},
-        "to": to_list,
+    # Monta payload da Brevo
+    payload: dict = {
+        "sender": {
+            "email": sender_email,
+            "name": sender_name,
+        },
+        "to": [{"email": email} for email in recipients],
         "subject": subject,
-        "htmlContent": html_content,
+        "htmlContent": html_body,
     }
+
+    # Opcional: se quiser usar uma lista da Brevo em produção
+    env = (_get_env("NEWS_ENV", "manual") or "manual").lower()
+    list_id = _get_env("BREVO_LIST_ID", "")
+    if env in {"prod", "production", "live"} and list_id:
+        try:
+            payload["listIds"] = [int(list_id)]
+        except ValueError:
+            # Se o ID não for inteiro, simplesmente ignora
+            pass
+
+    data = json.dumps(payload).encode("utf-8")
 
     headers = {
-        "api-key": api_key,
         "Content-Type": "application/json",
         "accept": "application/json",
+        "api-key": api_key,
     }
 
+    req = Request(BREVO_ENDPOINT, data=data, headers=headers, method="POST")
+
     try:
-        resp = requests.post(
-            "https://api.brevo.com/v3/smtp/email",
-            json=payload,
-            headers=headers,
-            timeout=30,
-        )
-        resp.raise_for_status()
-        print("E-mail enviado via Brevo com sucesso. Status:", resp.status_code)
-    except Exception as e:
-        print("Falha ao enviar e-mail via Brevo:", e)
-        try:
-            print("Resposta da Brevo:", resp.status_code, resp.text)
-        except Exception:
-            pass
-        raise
+        with urlopen(req, timeout=20) as resp:
+            # se quiser logar algo, dá para ler o body:
+            resp.read()
+    except HTTPError as e:
+        body = e.read().decode("utf-8", errors="replace")
+        raise RuntimeError(f"Brevo API HTTP error: {e.code} {e.reason} – {body}") from e
+    except URLError as e:
+        raise RuntimeError(f"Brevo API URL error: {e}") from e
