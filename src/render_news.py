@@ -43,6 +43,7 @@ def render_html(sections: Dict[str, List[Article]]) -> str:
     healthtechs_html = _render_article_list(sections.get(SECTION_HEALTHTECHS, []))
     wellness_html = _render_article_list(sections.get(SECTION_WELLNESS, []))
 
+    # Top 5 baseado em Brasil + Mundo + Healthtechs
     top_candidates: List[Article] = []
     for key in (SECTION_BRASIL, SECTION_MUNDO, SECTION_HEALTHTECHS):
         top_candidates.extend(sections.get(key, []))
@@ -84,7 +85,7 @@ def render_html(sections: Dict[str, List[Article]]) -> str:
           <!-- Header -->
           <tr>
             <td style="background:linear-gradient(135deg,#0f766e,#2563eb);padding:20px 24px 18px 24px;color:#ecfeff;">
-              <div style="font-size:11px;letter-spacing:0.08em;text-transform:uppercase;opacity:0.85;">Curadoria diária • {today}</div>
+              <div style="font-size:11px;letter-spacing:0.08em;text-transform:uppercase;opacity:0.85;">Curadoria diária · {today}</div>
               <h1 style="margin:4px 0 6px 0;font-size:22px;">Principais notícias de Saúde – Brasil e Mundo</h1>
               <p style="margin:0;font-size:13px;max-width:540px;line-height:1.5;opacity:0.95;">
                 Radar rápido de movimentos em operadoras, hospitais, planos de saúde, laboratórios, healthtechs e tendências de bem-estar.
@@ -164,5 +165,4 @@ def render_html(sections: Dict[str, List[Article]]) -> str:
   </table>
 </body>
 </html>"""
-
     return html
