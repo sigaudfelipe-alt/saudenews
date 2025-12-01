@@ -1,271 +1,280 @@
-# -*- coding: utf-8 -*-
-import feedparser
-from bs4 import BeautifulSoup
+"""News fetching and very simple heuristic curation.
 
-"""
-news_fetcher.py
+This module is intentionally genérico e resiliente:
+- Usa apenas bibliotecas padrão (requests é opcional, mas geralmente já está disponível).
+- Faz uma varredura simples na home de cada fonte e pega alguns links/editoriais.
+- Aplica regras de *score* para priorizar manchetes mais aderentes a saúde/digital.
 
-Busca notícias em fontes RSS e aplica filtros por seção:
-- brasil_operadoras    → SUS, operadoras, hospitais, laboratórios, planos de saúde
-- mundo_saude_global   → sistemas de saúde / health insurance / política de saúde
-- healthtechs          → saúde digital, healthtechs, telemedicina, apps de saúde, medtech
-- wellness             → bem-estar, saúde mental, estilo de vida
-
-A saída é usada pelo render_news.py para montar a newsletter.
+Não é um crawler perfeito, mas é o suficiente para ter um *radar* diário automático.
+Se quiser melhorar a captura de uma fonte específica, dá para criar funções dedicadas
+aqui e mapear por domínio.
 """
 
-# =========================
-#   FONTES POR SEÇÃO
-# =========================
+from __future__ import annotations
 
-RSS_SOURCES = {
-    "brasil_operadoras": [
-        # Ministério da Saúde / SUS / ANS / Governo
-        "https://www.gov.br/saude/pt-br/assuntos/noticias/@@rss.xml",
-        "https://www.gov.br/ans/pt-br/assuntos/noticias-ans/@@rss.xml",
-        # Agência Brasil – Saúde
-        "https://agenciabrasil.ebc.com.br/rss/saude.xml",
-        # Especializados em saúde no Brasil
-        "https://medicinasa.com.br/feed/",
-        "https://healthcare.grupomidia.com/feed/",
-        "https://saudedigitalnews.com.br/feed/",
-        # Jornais / negócios – ainda permitidos, mas filtrados por saúde e operadoras
-        "https://valor.globo.com/rss/",
-        "https://oglobo.globo.com/rss.xml",
-        "https://www.braziljournal.com/feed/",
-        "https://neofeed.com.br/feed/",
-        "https://pipelinevalor.globo.com/rss/",
-    ],
+import re
+import sys
+import logging
+from dataclasses import dataclass
+from html.parser import HTMLParser
+from typing import Dict, List, Optional
+from urllib.parse import urljoin, urlparse
+from urllib.request import Request, urlopen
+from urllib.error import URLError, HTTPError
 
-    "mundo_saude_global": [
-        "https://rss.nytimes.com/services/xml/rss/nyt/Health.xml",
-        "https://www.who.int/feeds/entity/mediacentre/news/en/rss.xml",
-    ],
+from .sources import (
+    Source,
+    sources_by_section,
+    SECTION_BRASIL,
+    SECTION_MUNDO,
+    SECTION_HEALTHTECHS,
+    SECTION_WELLNESS,
+)
 
-    "healthtechs": [
-        # Inovação, digital health, healthtechs
-        "https://techcrunch.com/feed/",
-        "https://www.businessinsider.com/sai/rss",
-        "https://www.mobihealthnews.com/rss",
-        "https://www.digitalhealth.net/feed/",
-    ],
-
-    "wellness": [
-        "https://rss.nytimes.com/services/xml/rss/nyt/Well.xml",
-    ],
-}
-
-# =======================================
-#   PALAVRAS-CHAVE POR TEMA / SEÇÃO
-# =======================================
-
-HEALTH_KEYWORDS_PT = [
-    "saúde", "saude",
-    "hospital", "hospitais",
-    "clínica", "clinica", "clínicas", "clinicas",
-    "laboratório", "laboratorio", "laboratórios", "laboratorios",
-    "diagnóstico", "diagnostico", "exame", "exames",
-    "vacina", "vacinas",
-    "tratamento", "doença", "doencas", "doenças",
-    "oncologia", "câncer", "cancer",
-    "uti", "internação", "internacao",
-    "unidade básica de saúde", "ubs", "upa", "upas",
-]
-
-HEALTH_KEYWORDS_EN = [
-    "health", "healthcare",
-    "hospital", "hospitals",
-    "clinic", "clinics",
-    "diagnostic", "diagnostics",
-    "disease", "diseases",
-    "vaccine", "vaccines",
-    "treatment", "patients", "patient",
-]
-
-# Específicas para Brasil & Operadoras
-BR_OPERADORAS_KEYWORDS = [
-    "plano de saúde", "planos de saúde", "plano de saude", "planos de saude",
-    "operadora", "operadoras",
-    "seguro saúde", "seguro-saúde", "seguro saude",
-    "convênio médico", "convenio médico", "convenio medico",
-    "coparticipação", "coparticipacao",
-    "ans", "agência nacional de saúde suplementar",
-    "sus", "sistema único de saúde", "sistema unico de saude",
-    "rede credenciada", "rede própria", "rede propria",
-    "hospital filantrópico", "hospitais filantrópicos",
-    # principais grupos
-    "unimed", "hapvida", "notredame", "amil",
-    "bradesco saúde", "bradesco saude",
-    "sulamérica saúde", "sulamerica saude", "sulamérica saude",
-    "rede d'or", "rede dor",
-    "dasa", "fleury", "oncoclínicas", "oncoclinicas",
-    "laboratório clínico", "laboratorio clinico",
-]
-
-# Healthtech & digital health
-HEALTHTECH_TERMS = [
-    "healthtech", "health tech",
-    "digital health", "saúde digital", "saude digital",
-    "telemedicina", "teleconsulta",
-    "telehealth", "telemedicine",
-    "prontuário eletrônico", "prontuario eletronico",
-    "remote patient monitoring", "rpm",
-    "app de saúde", "app de saude", "health app",
-    "medtech", "e-health", "ehealth",
-    "plataforma digital de saúde", "plataforma digital de saude",
-    "dados de saúde", "dados de saude",
-    "conexa saúde", "conexa saude",
-]
-
-HEALTHTECH_INNOVATION = [
-    "startup", "startups", "start-up",
-    "funding", "fundraise", "raises",
-    "rodada", "investimento", "investimentos",
-    "seed round", "series a", "series b",
-    "venture capital", "vc",
-    "parceria", "parcerias",
-    "aquisição", "aquisicao", "acquisition",
-    "lançamento", "lancamento", "lança", "lanca",
-]
-
-# Wellness
-WELLNESS_KEYWORDS = [
-    "wellness", "bem-estar", "bem estar",
-    "saúde mental", "saude mental",
-    "ansiedade", "depressão", "depressao",
-    "sono", "sleep", "insônia", "insonia",
-    "mindfulness", "meditação", "meditacao",
-    "burnout", "stress", "estresse",
-    "atividade física", "atividade fisica",
-    "exercício", "exercicio",
-    "lifestyle",
-]
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 
-# =========================
-#   FUNÇÕES DE APOIO
-# =========================
-
-def _clean_summary(raw_summary: str) -> str:
-    """Limpa HTML básico e corta o tamanho para caber bem no e-mail."""
-    if not raw_summary:
-        return ""
-    text = BeautifulSoup(raw_summary, "html.parser").get_text(separator=" ")
-    text = text.replace("\n", " ").strip()
-    if len(text) > 260:
-        text = text[:257] + "..."
-    return text
+@dataclass
+class Article:
+    title: str
+    url: str
+    source_name: str
+    section: str
+    score: float = 0.0
 
 
-def is_relevant(section: str, title: str, summary: str) -> bool:
-    """Decide se a notícia é relevante para cada seção."""
-    text = f"{title} {summary}".lower()
+# -----------------------------------------------------------------------------
+# HTML parsing util
+# -----------------------------------------------------------------------------
 
-    # ------------------------
-    # Brasil – Saúde & Operadoras
-    # ------------------------
-    if section == "brasil_operadoras":
-        # precisa bater em termos de operadoras/SUS/hospitais/labs
-        if any(k in text for k in BR_OPERADORAS_KEYWORDS):
-            return True
-        # fallback: notícia claramente de saúde (hospital, SUS, etc.)
-        base = HEALTH_KEYWORDS_PT + HEALTH_KEYWORDS_EN
-        return any(k in text for k in base)
 
-    # ------------------------
-    # Healthtechs – Brasil e Mundo
-    # ------------------------
-    if section == "healthtechs":
-        # 1) precisa falar de digital health / healthtech / telemedicina / app de saúde etc
-        has_digital_health = any(k in text for k in HEALTHTECH_TERMS)
+class LinkExtractor(HTMLParser):
+    """Minimal HTML parser to collect candidate article links.
 
-        # 2) idealmente também falar de inovação / startup / funding, mas não é obrigatório
-        has_innovation = any(k in text for k in HEALTHTECH_INNOVATION)
+    We store links with visible text length > 35 chars (heurística para evitar menu),
+    and ignore óbvios lixos como "Assine", "Login" etc.
+    """
 
-        # 3) base de saúde genérica, para garantir que tem contexto de saúde
-        base_health = HEALTH_KEYWORDS_PT + HEALTH_KEYWORDS_EN
+    def __init__(self, base_url: str):
+        super().__init__()
+        self.base_url = base_url
+        self.in_a = False
+        self.current_href: Optional[str] = None
+        self.current_text_parts: List[str] = []
+        self.links: List[Article] = []
 
-        # Regra:
-        # - sempre aceita quando tem termos de digital health E saúde
-        # - OU quando é inovação clara de healthtech (digital health + inovação)
-        if has_digital_health and any(b in text for b in base_health):
-            return True
-        if has_digital_health and has_innovation:
-            return True
+    def handle_starttag(self, tag, attrs):
+        if tag.lower() == "a":
+            href = None
+            for k, v in attrs:
+                if k.lower() == "href":
+                    href = v
+                    break
+            if href:
+                self.in_a = True
+                self.current_href = href
+                self.current_text_parts = []
 
-        # Bloqueia coisas totalmente fora (spotify, iphone, bicicleta etc)
-        return False
+    def handle_data(self, data):
+        if self.in_a:
+            self.current_text_parts.append(data.strip())
 
-    # ------------------------
-    # Wellness – EUA / Europa
-    # ------------------------
-    if section == "wellness":
-        return any(k in text for k in WELLNESS_KEYWORDS)
+    def handle_endtag(self, tag):
+        if tag.lower() == "a" and self.in_a:
+            text = " ".join([t for t in self.current_text_parts if t])
+            href = self.current_href
+            self.in_a = False
+            self.current_href = None
+            self.current_text_parts = []
 
-    # ------------------------
-    # Mundo – Saúde Global
-    # ------------------------
-    if section == "mundo_saude_global":
-        global_keywords = (
-            HEALTH_KEYWORDS_EN
-            + [
-                "health insurance",
-                "insurance premiums",
-                "medicare",
-                "medicaid",
-                "universal health coverage",
-                "universal health care",
+            if not href or not text:
+                return
+
+            # Very simple filters
+            if len(text) < 35:
+                return
+            lowered = text.lower()
+            blacklist = [
+                "assine",
+                "assinar",
+                "login",
+                "cadastre-se",
+                "cookies",
+                "política de privacidade",
+                "newsletter",
+                "podcast",
             ]
-        )
-        return any(k in text for k in global_keywords)
+            if any(b in lowered for b in blacklist):
+                return
 
-    return False
+            full_url = urljoin(self.base_url, href)
+            self.links.append((text.strip(), full_url))
 
 
-def fetch_rss(url: str, section: str, max_items: int = 20):
-    """Busca itens de um feed RSS, filtra por relevância e devolve dicionários básicos."""
+# -----------------------------------------------------------------------------
+# Fetch helpers
+# -----------------------------------------------------------------------------
+
+
+def _http_get(url: str, timeout: int = 15) -> Optional[str]:
+    """Small helper around urllib; keeps requirements low."""
+    logger.info("Fetching %s", url)
+    headers = {
+        "User-Agent": "Mozilla/5.0 (compatible; SaudeNewsBot/1.0)"
+    }
+    req = Request(url, headers=headers)
     try:
-        feed = feedparser.parse(url)
-        items = []
+        with urlopen(req, timeout=timeout) as resp:
+            charset = resp.headers.get_content_charset() or "utf-8"
+            html = resp.read().decode(charset, errors="replace")
+            return html
+    except HTTPError as e:
+        logger.warning("HTTP error fetching %s: %s", url, e)
+    except URLError as e:
+        logger.warning("URL error fetching %s: %s", url, e)
+    except Exception as e:  # noqa: BLE001
+        logger.exception("Unexpected error fetching %s: %s", url, e)
+    return None
 
-        for entry in feed.entries:
-            title = getattr(entry, "title", "").strip()
-            raw_summary = getattr(entry, "summary", "") or getattr(entry, "description", "")
-            summary = _clean_summary(raw_summary)
-            link = getattr(entry, "link", "").strip()
 
-            if not title or not link:
-                continue
+def _score_title(title: str, section: str) -> float:
+    """Very simple scoring to priorizar o que faz mais sentido para saúde digital."""
+    t = title.lower()
+    score = 0.0
 
-            if not is_relevant(section, title, summary):
-                continue
+    # sinais positivos
+    positives = [
+        "saúde digital",
+        "telemedicina",
+        "healthtech",
+        "plano de saúde",
+        "operadora",
+        "hospita",
+        "sus",
+        "startup",
+        "ia",
+        "inteligência artificial",
+        "mental health",
+        "wellness",
+        "fitness",
+        "obesity",
+        "longevity",
+        "insurance",
+        "payer",
+        "medicare",
+        "value-based",
+    ]
+    for p in positives:
+        if p in t:
+            score += 2.0
 
-            items.append(
-                {
-                    "title": title,
-                    "link": link,
-                    "summary": summary,
-                    "source": url,
-                }
-            )
+    # sinais negativos
+    negatives = [
+        "eleição",
+        "trump",
+        "biden",
+        "republican",
+        "democrat",
+        "crime",
+        "investigation",
+        "lawsuit",
+    ]
+    for n in negatives:
+        if n in t:
+            score -= 3.0
 
-            if len(items) >= max_items:
-                break
+    # booster por seção
+    if section == SECTION_WELLNESS:
+        if any(w in t for w in ["sleep", "stress", "workout", "diet", "exercise", "mental"]):
+            score += 1.0
 
-        return items
-    except Exception:
+    return score
+
+
+def _domain(url: str) -> str:
+    return urlparse(url).netloc
+
+
+def fetch_from_source(source: Source) -> List[Article]:
+    """Fetch a handful of candidate articles from a single Source."""
+    html = _http_get(source.url)
+    if not html:
         return []
 
+    parser = LinkExtractor(base_url=source.url)
+    parser.feed(html)
+    candidates: List[Article] = []
+    seen_urls = set()
 
-def fetch_all_news():
+    for text, href in parser.links:
+        if href in seen_urls:
+            continue
+        seen_urls.add(href)
+
+        score = _score_title(text, source.section)
+        # descartamos coisas muito irrelevantes
+        if score < -1:
+            continue
+
+        candidates.append(
+            Article(
+                title=text,
+                url=href,
+                source_name=source.name,
+                section=source.section,
+                score=score,
+            )
+        )
+
+    # ordena por score desc + título
+    candidates.sort(key=lambda a: (a.score, a.title), reverse=True)
+    return candidates[: source.max_articles]
+
+
+def fetch_all_news() -> Dict[str, List[Article]]:
+    """Fetch news grouped by section.
+
+    Returns:
+        dict(section -> list[Article])
     """
-    Retorna um dicionário com as listas de notícias por seção da newsletter,
-    já filtradas para temas de saúde / operadoras / hospitais / labs / healthtech / wellness.
-    """
-    all_news = {}
-    for section_key, urls in RSS_SOURCES.items():
-        section_items = []
-        for url in urls:
-            section_items.extend(fetch_rss(url, section_key))
-        all_news[section_key] = section_items[:20]
-    return all_news
+    sections = sources_by_section()
+    results: Dict[str, List[Article]] = {
+        SECTION_BRASIL: [],
+        SECTION_MUNDO: [],
+        SECTION_HEALTHTECHS: [],
+        SECTION_WELLNESS: [],
+    }
+
+    for section, src_list in sections.items():
+        for src in src_list:
+            try:
+                articles = fetch_from_source(src)
+            except Exception as exc:  # noqa: BLE001
+                logger.exception("Error fetching from %s: %s", src.url, exc)
+                continue
+            results[section].extend(articles)
+
+        # dentro da seção, limitamos o total para evitar e-mails gigantes
+        if section == SECTION_BRASIL:
+            max_total = 12
+        elif section == SECTION_MUNDO:
+            max_total = 10
+        elif section == SECTION_HEALTHTECHS:
+            max_total = 8
+        else:
+            max_total = 8
+
+        results[section].sort(key=lambda a: (a.score, a.title), reverse=True)
+        results[section] = results[section][:max_total]
+
+    return results
+
+
+if __name__ == "__main__":  # pequeno teste manual
+    logging.basicConfig(stream=sys.stdout, level=logging.INFO)
+    news = fetch_all_news()
+    for section, arts in news.items():
+        print("\n===", section.upper(), "===")
+        for a in arts:
+            print(f"- ({a.source_name}) {a.title} -> {a.url} [score={a.score}]")
