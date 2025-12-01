@@ -1,16 +1,10 @@
-"""Renderização em HTML da newsletter de saúde.
-
-Este módulo recebe as notícias já agrupadas por seção e devolve uma string HTML
-pronta para ser enviada por e-mail (Brevo, Gmail, etc.).
-"""
-
 from __future__ import annotations
 
 from datetime import datetime
 from typing import Dict, List
 
-from .news_fetcher import Article
-from .sources import (
+from news_fetcher import Article
+from sources import (
     SECTION_BRASIL,
     SECTION_MUNDO,
     SECTION_HEALTHTECHS,
@@ -36,7 +30,6 @@ def _render_article_list(articles: List[Article]) -> str:
 
 
 def _today_str() -> str:
-    # Data no formato brasileiro
     return datetime.now().strftime("%d/%m/%Y")
 
 
@@ -45,14 +38,11 @@ def build_subject() -> str:
 
 
 def render_html(sections: Dict[str, List[Article]]) -> str:
-    """Render full HTML newsletter body."""
-
     brasil_html = _render_article_list(sections.get(SECTION_BRASIL, []))
     mundo_html = _render_article_list(sections.get(SECTION_MUNDO, []))
     healthtechs_html = _render_article_list(sections.get(SECTION_HEALTHTECHS, []))
     wellness_html = _render_article_list(sections.get(SECTION_WELLNESS, []))
 
-    # Top 5: pegamos os 5 primeiros somando Brasil + Mundo + Healthtechs
     top_candidates: List[Article] = []
     for key in (SECTION_BRASIL, SECTION_MUNDO, SECTION_HEALTHTECHS):
         top_candidates.extend(sections.get(key, []))
@@ -80,7 +70,6 @@ def render_html(sections: Dict[str, List[Article]]) -> str:
 
     today = _today_str()
 
-    # Layout simples, inspirado em newsletters tipo Brew / Beehiiv
     html = f"""<!DOCTYPE html>
 <html lang="pt-br">
 <head>
