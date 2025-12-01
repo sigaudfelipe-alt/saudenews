@@ -6,20 +6,17 @@ Secrets usados:
 - BREVO_API_KEY       -> API Key da Brevo (obrigatório)
 - BREVO_SENDER_EMAIL  -> e-mail do remetente (obrigatório)
 - BREVO_SENDER_NAME   -> nome do remetente (obrigatório)
+- BREVO_LIST_ID       -> opcional (id de lista da Brevo)
 
 Destinatários:
 
 - TO_EMAILS        -> lista de e-mails (produção), separados por vírgula
 - TO_EMAILS_MANUAL -> seu e-mail (ou poucos e-mails) para testes manuais
 
-Controle manual x produção:
+RUN_MODE (igual já aparece no seu workflow):
 
-- RUN_MODE:
-    - "workflow_dispatch" -> considera como execução MANUAL
-    - qualquer outro valor / vazio -> considera PRODUÇÃO
-
-Em modo MANUAL, envia para TO_EMAILS_MANUAL.
-Em modo PRODUÇÃO, envia para TO_EMAILS.
+- "workflow_dispatch" -> execução manual: envia para TO_EMAILS_MANUAL
+- qualquer outro valor -> execução normal: envia para TO_EMAILS
 """
 
 from __future__ import annotations
@@ -80,7 +77,6 @@ def send_email(subject: str, html_body: str) -> None:
         "htmlContent": html_body,
     }
 
-    # Se quiser, dá para usar BREVO_LIST_ID em produção; por enquanto, opcional
     list_id = _get_env("BREVO_LIST_ID", "")
     if list_id:
         try:
@@ -100,7 +96,7 @@ def send_email(subject: str, html_body: str) -> None:
 
     try:
         with urlopen(req, timeout=20) as resp:
-            resp.read()  # só para consumir o body
+            resp.read()
     except HTTPError as e:
         body = e.read().decode("utf-8", errors="replace")
         raise RuntimeError(f"Brevo API HTTP error: {e.code} {e.reason} – {body}") from e
