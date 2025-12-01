@@ -1,13 +1,10 @@
-"""Entry point da newsletter de Saúde.
+"""
+Entry point da newsletter de Saúde.
 
-Orquestra:
+Fluxo:
 1. Busca notícias.
 2. Renderiza HTML.
-3. Envia por e-mail via SMTP.
-
-Mantive o nome `main.py` com um `main()` simples + bloco `if __name__ == '__main__'`
-para funcionar bem tanto em GitHub Actions (python -m src.main ou python src/main.py)
-quanto localmente.
+3. Envia por e-mail (Brevo API).
 """
 
 from __future__ import annotations
@@ -15,10 +12,9 @@ from __future__ import annotations
 import logging
 import sys
 
-from .news_fetcher import fetch_all_news
-from .render_news import render_html, build_subject
-from .send_email import send_email
-
+from news_fetcher import fetch_all_news
+from render_news import render_html, build_subject
+from send_email import send_email
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +32,7 @@ def main() -> None:
     html = render_html(sections)
     subject = build_subject()
 
-    logger.info("Enviando e-mail da newsletter...")
+    logger.info("Enviando e-mail da newsletter via Brevo API...")
     send_email(subject=subject, html_body=html)
 
     logger.info("Newsletter enviada com sucesso.")
