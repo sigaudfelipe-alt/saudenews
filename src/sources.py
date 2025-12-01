@@ -20,11 +20,7 @@ SECTION_WELLNESS = "wellness"
 
 
 def _build_sources() -> List[Source]:
-    """Return the full list of sources used by the newsletter.
-
-    The idea is to centralize everything here, para ficar fácil ajustar no futuro.
-    Se quiser adicionar/remover fontes, basta editar esta função.
-    """
+    """Return the full list of sources used by the newsletter."""
     sources: List[Source] = []
 
     # -------------------------------------------------------------------------
@@ -35,12 +31,12 @@ def _build_sources() -> List[Source]:
         ("Folha – Equilíbrio e Saúde", "https://www1.folha.uol.com.br/equilibrioesaude/"),
         ("O Globo – Saúde", "https://oglobo.globo.com/saude/"),
         ("Valor Econômico – Saúde", "https://valor.globo.com/brasil/saude/"),
-        ("Brazil Journal", "https://braziljournal.com/"),  # negócios & saúde
-        ("Pipeline – Valor", "https://pipelinevalor.globo.com/"),  # deals
-        ("NeoFeed", "https://neofeed.com.br/"),  # negócios & inovação
-        ("Medicina S/A", "https://medicinasa.com.br/"),  # já usávamos
-        ("Saúde Digital News", "https://saudedigitalnews.com.br/"),  # digital health
-        ("Healthcare – Grupo Mídia", "https://healthcare.grupomidia.com/"),  # gestão hospitalar
+        ("Brazil Journal", "https://braziljournal.com/"),
+        ("Pipeline – Valor", "https://pipelinevalor.globo.com/"),
+        ("NeoFeed", "https://neofeed.com.br/"),
+        ("Medicina S/A", "https://medicinasa.com.br/"),
+        ("Saúde Digital News", "https://saudedigitalnews.com.br/"),
+        ("Healthcare – Grupo Mídia", "https://healthcare.grupomidia.com/"),
     ]
     for name, url in brasil_sites:
         sources.append(
@@ -56,14 +52,14 @@ def _build_sources() -> List[Source]:
     # MUNDO – Sistemas de Saúde, Regulação & Política
     # -------------------------------------------------------------------------
     world_sites = [
-        ("New York Times – Health", "https://www.nytimes.com/section/health"),  # já usávamos
-        ("Financial Times – Health", "https://www.ft.com/health"),  # health policy & business
+        ("New York Times – Health", "https://www.nytimes.com/section/health"),
+        ("Financial Times – Health", "https://www.ft.com/health"),
         ("Wall Street Journal – Health Industry", "https://www.wsj.com/news/types/health-industry"),
         ("Bloomberg – Health", "https://www.bloomberg.com/topics/health"),
         ("Reuters – Healthcare & Pharma", "https://www.reuters.com/business/healthcare-pharmaceuticals/"),
-        ("Modern Healthcare", "https://www.modernhealthcare.com/"),  # pedida por você
-        ("STAT News", "https://www.statnews.com/"),  # ciência & health policy
-        ("Fierce Healthcare", "https://www.fiercehealthcare.com/"),  # US health system
+        ("Modern Healthcare", "https://www.modernhealthcare.com/"),
+        ("STAT News", "https://www.statnews.com/"),
+        ("Fierce Healthcare", "https://www.fiercehealthcare.com/"),
     ]
     for name, url in world_sites:
         sources.append(
@@ -79,12 +75,12 @@ def _build_sources() -> List[Source]:
     # HEALTHTECHS – Inovação, Startups, Digital Health
     # -------------------------------------------------------------------------
     healthtech_sites = [
-        ("TechCrunch – Healthtech", "https://techcrunch.com/tag/healthtech/"),  # deals & startups
+        ("TechCrunch – Healthtech", "https://techcrunch.com/tag/healthtech/"),
         ("TechCrunch – Digital Health", "https://techcrunch.com/tag/digital-health/"),
-        ("MobiHealthNews", "https://mobihealthnews.com/"),  # clássico
-        ("Fierce Digital Health", "https://www.fiercehealthcare.com/tech"),  # tech em saúde
-        ("Sifted – Healthtech", "https://sifted.eu/sector/healthtech"),  # Europa
-        ("CB Insights – Digital Health", "https://www.cbinsights.com/research/category/digital-health/"),  # relatórios
+        ("MobiHealthNews", "https://mobihealthnews.com/"),
+        ("Fierce Digital Health", "https://www.fiercehealthcare.com/tech"),
+        ("Sifted – Healthtech", "https://sifted.eu/sector/healthtech"),
+        ("CB Insights – Digital Health", "https://www.cbinsights.com/research/category/digital-health/"),
     ]
     for name, url in healthtech_sites:
         sources.append(
@@ -100,12 +96,12 @@ def _build_sources() -> List[Source]:
     # WELLNESS – EUA / Europa
     # -------------------------------------------------------------------------
     wellness_sites = [
-        ("Fitt Insider", "https://insider.fitt.co/"),  # você pediu explicitamente
-        ("Well+Good", "https://www.wellandgood.com/"),  # wellness moderno
-        ("MindBodyGreen", "https://www.mindbodygreen.com/"),  # lifestyle saudável
-        ("Healthline – Wellness", "https://www.healthline.com/wellness"),  # conteúdo baseado em evidência
-        ("WSJ – Wellness", "https://www.wsj.com/lifestyle/wellness"),  # tendência premium
-        ("NYTimes – Well", "https://www.nytimes.com/section/well"),  # ainda assim limitamos
+        ("Fitt Insider", "https://insider.fitt.co/"),
+        ("Well+Good", "https://www.wellandgood.com/"),
+        ("MindBodyGreen", "https://www.mindbodygreen.com/"),
+        ("Healthline – Wellness", "https://www.healthline.com/wellness"),
+        ("WSJ – Wellness", "https://www.wsj.com/lifestyle/wellness"),
+        ("NYTimes – Well", "https://www.nytimes.com/section/well"),
     ]
     for name, url in wellness_sites:
         sources.append(
