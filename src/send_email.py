@@ -1,32 +1,36 @@
 """
 Envio de e-mail da newsletter via Brevo (Sendinblue) API.
 
-Secrets usados:
+Secrets usados (GitHub Actions):
 
-- BREVO_API_KEY       -> API Key da Brevo (obrigatório)
-- BREVO_SENDER_EMAIL  -> e-mail do remetente (obrigatório)
-- BREVO_SENDER_NAME   -> nome do remetente (obrigatório)
-- BREVO_LIST_ID       -> opcional (id de lista da Brevo)
+Obrigatórios:
+- BREVO_API_KEY       -> API Key da Brevo
+- BREVO_SENDER_EMAIL  -> e-mail do remetente
+- BREVO_SENDER_NAME   -> nome do remetente
+- TO_EMAILS_MANUAL    -> seu e-mail (para testes manuais)
 
-Destinatários:
+Opcionais:
+- TO_EMAILS           -> e-mails diretos (produção), separados por vírgula
+- BREVO_LIST_ID       -> ID da lista da Brevo (produção)
 
-- TO_EMAILS        -> lista de e-mails (produção), separados por vírgula
-- TO_EMAILS_MANUAL -> seu e-mail (ou poucos e-mails) para testes manuais
+Lógica:
 
-RUN_MODE (igual já aparece no seu workflow):
+- RUN_MODE == "workflow_dispatch"  -> execução MANUAL
+    - envia APENAS para TO_EMAILS_MANUAL (não usa lista)
 
-- "workflow_dispatch" -> execução manual: envia para TO_EMAILS_MANUAL
-- qualquer outro valor -> execução normal: envia para TO_EMAILS
+- Qualquer outro RUN_MODE          -> execução NORMAL / agendada
+    - se TO_EMAILS estiver setado  -> envia para esses e-mails
+    - senão, se BREVO_LIST_ID estiver setado -> envia para a LISTA da Brevo
+    - se nenhum dos dois estiver setado      -> erro
 """
 
 from __future__ import annotations
 
 import json
 import os
-from typing import List
+from typing import List, Tuple
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
-
 
 BREVO_ENDPOINT = "https://api.brevo.com/v3/smtp/email"
 
@@ -38,26 +42,46 @@ def _get_env(name: str, default: str | None = None, required: bool = False) -> s
     return value or ""
 
 
-def get_recipients() -> List[str]:
+def _resolve_recipients_and_lists() -> Tuple[List[str], List[int]]:
     """
-    Decide a lista de destinatários usando RUN_MODE.
+    Resolve destinatários diretos (to) e listas (listIds) com base em RUN_MODE.
 
-    - Se RUN_MODE == "workflow_dispatch" (execução manual do workflow),
-      envia para TO_EMAILS_MANUAL.
-
-    - Caso contrário, envia para TO_EMAILS (produção).
+    Retorna:
+        (emails_to, list_ids)
     """
     run_mode = (_get_env("RUN_MODE", "") or "").lower()
 
-    if run_mode == "workflow_dispatch":
-        raw = _get_env("TO_EMAILS_MANUAL", _get_env("TO_EMAILS", ""), required=True)
-    else:
-        raw = _get_env("TO_EMAILS", required=True)
+    to_manual = os.getenv("TO_EMAILS_MANUAL", "").strip()
+    to_prod = os.getenv("TO_EMAILS", "").strip()
+    list_id_raw = os.getenv("BREVO_LIST_ID", "").strip()
 
-    emails = [e.strip() for e in raw.split(",") if e.strip()]
-    if not emails:
-        raise RuntimeError("No recipients resolved for newsletter")
-    return emails
+    emails_to: List[str] = []
+    list_ids: List[int] = []
+
+    # Execução manual: só vai pra você
+    if run_mode == "workflow_dispatch":
+        raw = to_manual or to_prod  # fallback em TO_EMAILS se manual não existir
+        if not raw:
+            raise RuntimeError("TO_EMAILS_MANUAL/TO_EMAILS must be set for manual runs")
+        emails_to = [e.strip() for e in raw.split(",") if e.strip()]
+        # não envia pra lista em modo manual
+        return emails_to, list_ids
+
+    # Execução normal / agendada
+    if to_prod:
+        emails_to = [e.strip() for e in to_prod.split(",") if e.strip()]
+
+    if list_id_raw:
+        try:
+            list_ids = [int(list_id_raw)]
+        except ValueError:
+            # se não for inteiro, simplesmente ignoramos
+            list_ids = []
+
+    if not emails_to and not list_ids:
+        raise RuntimeError("No recipients configured: set TO_EMAILS and/or BREVO_LIST_ID")
+
+    return emails_to, list_ids
 
 
 def send_email(subject: str, html_body: str) -> None:
@@ -65,24 +89,22 @@ def send_email(subject: str, html_body: str) -> None:
     sender_email = _get_env("BREVO_SENDER_EMAIL", required=True)
     sender_name = _get_env("BREVO_SENDER_NAME", required=True)
 
-    recipients = get_recipients()
+    emails_to, list_ids = _resolve_recipients_and_lists()
 
     payload: dict = {
         "sender": {
             "email": sender_email,
             "name": sender_name,
         },
-        "to": [{"email": email} for email in recipients],
         "subject": subject,
         "htmlContent": html_body,
     }
 
-    list_id = _get_env("BREVO_LIST_ID", "")
-    if list_id:
-        try:
-            payload["listIds"] = [int(list_id)]
-        except ValueError:
-            pass
+    if emails_to:
+        payload["to"] = [{"email": email} for email in emails_to]
+
+    if list_ids:
+        payload["listIds"] = list_ids
 
     data = json.dumps(payload).encode("utf-8")
 
