@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import re
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, date
 from html.parser import HTMLParser
 from typing import Dict, List, Optional
 from urllib.error import HTTPError, URLError
@@ -43,11 +43,13 @@ HEALTH_KEYWORDS = [
     "enferm",
     "nurse",
     "plano de saúde",
+    "plano de saude",
     "operadora",
     "sus",
     "ans",
     "clinic",
     "clínica",
+    "clinica",
     "telemedicina",
     "digital health",
     "healthtech",
@@ -55,8 +57,10 @@ HEALTH_KEYWORDS = [
     "obesity",
     "diabetes",
     "câncer",
+    "cancer",
     "mental health",
     "saúde mental",
+    "saude mental",
     "wellness",
     "fitness",
     "medicare",
@@ -64,6 +68,35 @@ HEALTH_KEYWORDS = [
     "drug",
     "medication",
     "vaccine",
+]
+
+# Operadoras e planos – para dar mais peso a estas notícias
+OPERATOR_KEYWORDS = [
+    "hapvida",
+    "notredame",
+    "ixcmed",
+    "intermédica",
+    "intermedica",
+    "amil",
+    "bradesco saúde",
+    "bradesco saude",
+    "sulamérica saúde",
+    "sulamerica saude",
+    "sulamerica saúde",
+    "unimed",
+    "prevent senior",
+    "sami saúde",
+    "sami saude",
+    "alice saúde",
+    "alice saude",
+    "qsaúde",
+    "qsaude",
+    "cassi",
+    "postal saúde",
+    "postal saude",
+    "geap",
+    "vivest",
+    "golden cross",
 ]
 
 # Notícias que queremos excluir totalmente (polícia / morte / crime)
@@ -121,6 +154,7 @@ class LinkExtractor(HTMLParser):
             if not href or not text:
                 return
 
+            # evita links muito curtos / de navegação
             if len(text) < 35:
                 return
 
@@ -168,11 +202,19 @@ def _score_title(title: str, section: str) -> tuple[float, int]:
     score = 0.0
     health_hits = 0
 
+    # Saúde em geral
     for kw in HEALTH_KEYWORDS:
         if kw in t:
             score += 2.0
             health_hits += 1
 
+    # Operadoras – mais peso
+    for kw in OPERATOR_KEYWORDS:
+        if kw in t:
+            score += 3.0
+            health_hits += 1
+
+    # Negativos "soft" que jogam score para baixo
     negatives_soft = [
         "eleição",
         "trump",
@@ -187,6 +229,41 @@ def _score_title(title: str, section: str) -> tuple[float, int]:
         if n in t:
             score -= 3.0
 
+    # Regras extras para mundo (evitar notícias muito "operacionais" tipo layoffs)
+    if section == SECTION_MUNDO:
+        mundo_neg = [
+            "layoff",
+            "layoffs",
+            "to close",
+            "closure",
+            "closing",
+            "shutting",
+            "shut down",
+            "strike",
+            "walkout",
+            "union dispute",
+        ]
+        if any(w in t for w in mundo_neg):
+            score -= 2.0
+
+        mundo_pos = [
+            "medicare",
+            "medicaid",
+            "nhs",
+            "healthcare costs",
+            "health costs",
+            "primary care",
+            "health system",
+            "health systems",
+            "value-based care",
+            "value based care",
+            "coverage",
+            "universal health",
+        ]
+        if any(w in t for w in mundo_pos):
+            score += 1.5
+
+    # Wellness: pequenos bônus se título bate com temas de performance / hábitos
     if section == SECTION_WELLNESS:
         if any(w in t for w in ["sleep", "stress", "workout", "diet", "exercise", "mental"]):
             score += 1.0
@@ -194,24 +271,14 @@ def _score_title(title: str, section: str) -> tuple[float, int]:
     return score, health_hits
 
 
-def _is_recent_enough(title: str, max_days: int = 1) -> bool:
-    """
-    Tenta filtrar notícias muito antigas.
-    Regra mínima: se aparecer um ano < ano atual, descarta.
-    Se conseguir extrair data com ano atual, descarta se for mais de max_days atrás.
-    """
-    now = datetime.now()
-    current_year = now.year
-    t = title.lower()
+def _domain(url: str) -> str:
+    return urlparse(url).netloc
 
-    year_match = re.search(r"(20\d{2})", t)
-    if year_match:
-        year = int(year_match.group(1))
-        if year < current_year:
-            return False  # corta 2021, 2022, 2023 etc.
 
-    # Tentativas simples de dia/mês/ano com ano atual
-    # Ex: 24.nov.2025 ou 24 nov 2025
+def _parse_pt_en_date_tokens(day: int, mon_str: str, year: int) -> Optional[datetime]:
+    """Converte algo como '24 nov 2025' ou '24 novembro 2025' em datetime."""
+    mon_key = mon_str.strip().lower()[:3]
+
     months_pt = {
         "jan": 1,
         "fev": 2,
@@ -236,35 +303,190 @@ def _is_recent_enough(title: str, max_days: int = 1) -> bool:
         "jul": 7,
         "aug": 8,
         "sep": 9,
-        "sept": 9,
         "oct": 10,
         "nov": 11,
         "dec": 12,
     }
 
-    # dd.mon.yyyy pt/en
-    m = re.search(r"(\d{1,2})[.\s](jan|fev|mar|abr|mai|jun|jul|ago|set|out|nov|dez)[.\s,]*(20\d{2})", t)
-    if not m:
-        m = re.search(r"(\d{1,2})[.\s](jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[.\s,]*(20\d{2})", t)
+    mon = months_pt.get(mon_key) or months_en.get(mon_key)
+    if not mon:
+        return None
     try:
+        return datetime(year, mon, day)
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def _extract_date_from_string(text: str) -> Optional[datetime]:
+    """Tenta extrair uma data explícita de um texto (título, trechos)."""
+    t = text.lower()
+
+    # dd.mon.yyyy pt/en (ex: 24.nov.2025 ou 24 nov 2025)
+    m = re.search(
+        r"(\d{1,2})[.\s](jan|fev|mar|abr|mai|jun|jul|ago|set|out|nov|dez)[.\s,]*(20\d{2})",
+        t,
+    )
+    if not m:
+        m = re.search(
+            r"(\d{1,2})[.\s](jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[.\s,]*(20\d{2})",
+            t,
+        )
+    if m:
+        day = int(m.group(1))
+        mon_str = m.group(2)
+        year = int(m.group(3))
+        dt = _parse_pt_en_date_tokens(day, mon_str, year)
+        if dt:
+            return dt
+
+    # pt-BR: 20 de outubro de 2025
+    m = re.search(
+        r"(\d{1,2})\s+de\s+([a-zç]+)\s+de\s+(20\d{2})",
+        t,
+    )
+    if m:
+        day = int(m.group(1))
+        mon_str = m.group(2)
+        year = int(m.group(3))
+        dt = _parse_pt_en_date_tokens(day, mon_str, year)
+        if dt:
+            return dt
+
+    # en-US: October 20, 2025
+    m = re.search(
+        r"(january|february|march|april|may|june|july|august|september|october|november|december)\s+(\d{1,2}),\s*(20\d{2})",
+        t,
+    )
+    if m:
+        mon_str = m.group(1)
+        day = int(m.group(2))
+        year = int(m.group(3))
+        dt = _parse_pt_en_date_tokens(day, mon_str, year)
+        if dt:
+            return dt
+
+    return None
+
+
+def _extract_date_from_url(url: str) -> Optional[datetime]:
+    """Tenta extrair data da URL (muito comum em portais de notícia)."""
+    # /2025/11/24/ ou similar
+    m = re.search(r"/(20\d{2})/(\d{1,2})/(\d{1,2})/", url)
+    if m:
+        year = int(m.group(1))
+        month = int(m.group(2))
+        day = int(m.group(3))
+        try:
+            return datetime(year, month, day)
+        except Exception:  # noqa: BLE001
+            return None
+
+    # /24/11/2025/
+    m = re.search(r"/(\d{1,2})/(\d{1,2})/(20\d{2})/", url)
+    if m:
+        day = int(m.group(1))
+        month = int(m.group(2))
+        year = int(m.group(3))
+        try:
+            return datetime(year, month, day)
+        except Exception:  # noqa: BLE001
+            return None
+
+    return None
+
+
+def _extract_date_from_html(html: str) -> Optional[datetime]:
+    """Tenta extrair data do HTML do artigo (meta tags + textos)."""
+
+    # 1) Meta tags com ISO-8601
+    meta_patterns = [
+        r'property=["\']article:published_time["\'][^>]*content=["\']([^"\']+)["\']',
+        r'name=["\']date["\'][^>]*content=["\']([^"\']+)["\']',
+        r'itemprop=["\']datePublished["\'][^>]*content=["\']([^"\']+)["\']',
+    ]
+    for pat in meta_patterns:
+        m = re.search(pat, html, re.IGNORECASE)
         if m:
-            day = int(m.group(1))
-            mon_str = m.group(2)
-            year = int(m.group(3))
-            mon = months_pt.get(mon_str, months_en.get(mon_str, 0))
-            if mon and year == current_year:
-                dt = datetime(year, mon, day)
-                delta_days = (now.date() - dt.date()).days
-                return delta_days <= max_days
-    except Exception:
-        pass
+            content = m.group(1)
+            m_iso = re.search(r"(20\d{2})-(\d{2})-(\d{2})", content)
+            if m_iso:
+                year = int(m_iso.group(1))
+                month = int(m_iso.group(2))
+                day = int(m_iso.group(3))
+                try:
+                    return datetime(year, month, day)
+                except Exception:  # noqa: BLE001
+                    pass
 
-    # Se não conseguimos extrair data, aceitamos (a home geralmente mostra recentes)
-    return True
+    # 2) Texto em pt-BR: 20 de outubro de 2025
+    m = re.search(
+        r"(\d{1,2})\s+de\s+([a-zç]+)\s+de\s+(20\d{2})",
+        html,
+        re.IGNORECASE,
+    )
+    if m:
+        day = int(m.group(1))
+        mon_str = m.group(2)
+        year = int(m.group(3))
+        dt = _parse_pt_en_date_tokens(day, mon_str, year)
+        if dt:
+            return dt
+
+    # 3) Texto em inglês: October 20, 2025
+    m = re.search(
+        r"(january|february|march|april|may|june|july|august|september|october|november|december)\s+(\d{1,2}),\s*(20\d{2})",
+        html,
+        re.IGNORECASE,
+    )
+    if m:
+        mon_str = m.group(1)
+        day = int(m.group(2))
+        year = int(m.group(3))
+        dt = _parse_pt_en_date_tokens(day, mon_str, year)
+        if dt:
+            return dt
+
+    return None
 
 
-def _domain(url: str) -> str:
-    return urlparse(url).netloc
+def _is_recent_enough(title: str, url: str, max_days: int = 1) -> bool:
+    """
+    Garante D-0 / D-1.
+    - Tenta extrair data do título, da URL e do HTML da matéria.
+    - Se a data for mais antiga que max_days, descarta.
+    - Se não encontrar data nenhuma, descarta (comportamento conservador).
+    """
+    now: date = datetime.now().date()
+
+    # 1) Título
+    dt = _extract_date_from_string(title)
+    if not dt:
+        # 2) URL
+        dt = _extract_date_from_url(url)
+
+    if dt is not None:
+        delta_days = (now - dt.date()).days
+        # Aceita apenas hoje ou ontem (0 ou 1 dia de diferença)
+        return 0 <= delta_days <= max_days
+
+    # 3) HTML do artigo – tentativa mais pesada
+    html = _http_get(url)
+    if html:
+        dt = _extract_date_from_html(html)
+        if dt is not None:
+            delta_days = (now - dt.date()).days
+            return 0 <= delta_days <= max_days
+
+        # fallback leve: se achar um ano antigo (< ano atual) bem claro, corta
+        current_year = datetime.now().year
+        m = re.search(r"(20\d{2})", html)
+        if m:
+            year = int(m.group(1))
+            if year < current_year:
+                return False
+
+    # Se não conseguimos determinar data, melhor excluir para garantir D-1
+    return False
 
 
 def fetch_from_source(source: Source) -> List[Article]:
@@ -288,13 +510,13 @@ def fetch_from_source(source: Source) -> List[Article]:
         if any(bad in lowered for bad in NEGATIVE_HARD):
             continue
 
-        # corta coisas muito antigas quando conseguimos identificar ano
-        if not _is_recent_enough(text, max_days=1):
+        # corta coisas mais antigas que D-1
+        if not _is_recent_enough(text, href, max_days=1):
             continue
 
         score, health_hits = _score_title(text, source.section)
 
-        # FONTES GENERALISTAS: exigem pelo menos 1 palavra de saúde
+        # FONTES GENERALISTAS: exigem pelo menos 1 palavra de saúde/operadora
         if not source.health_focus and health_hits == 0:
             continue
 
