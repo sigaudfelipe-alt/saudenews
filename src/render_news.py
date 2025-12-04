@@ -84,7 +84,7 @@ def render_html(sections: Dict[str, List[Article]]) -> str:
         <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="max-width:720px;background-color:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 10px 25px rgba(15,23,42,0.12);">
           <!-- Header -->
           <tr>
-            <td style="background:linear-gradient(135deg,#0f766e,#2563eb);padding:20px 24px 18px 24px;color:#ecfeff;">
+            <td style="background-color:#2563eb;padding:20px 24px 18px 24px;color:#ecfeff;">
               <div style="font-size:11px;letter-spacing:0.08em;text-transform:uppercase;opacity:0.85;">Curadoria diária · {today}</div>
               <h1 style="margin:4px 0 6px 0;font-size:22px;">Principais notícias de Saúde – Brasil e Mundo</h1>
               <p style="margin:0;font-size:13px;max-width:540px;line-height:1.5;opacity:0.95;">
