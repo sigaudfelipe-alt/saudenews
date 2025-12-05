@@ -3,7 +3,6 @@ from __future__ import annotations
 import logging
 import re
 from dataclasses import dataclass
-from datetime import datetime
 from html.parser import HTMLParser
 from typing import Dict, List, Optional
 from urllib.error import HTTPError, URLError
@@ -36,54 +35,58 @@ class Article:
 # NOVA LÓGICA DE CURADORIA
 # ------------------------------
 
-# Palavras que indicam que a notícia é RELEVANTE para:
-# - Saúde Digital
-# - Operadoras / Planos
-# - Saúde mental
-# - Wellness de performance / longevity
 POSITIVE_KEYWORDS = [
     # Digital health / tecnologia
     "telemedicina",
     "teleatendimento",
     "saúde digital",
+    "saude digital",
     "healthtech",
     "prontuário eletrônico",
     "prontuario eletrônico",
     "prontuario eletronico",
     "inteligência artificial",
     "inteligencia artificial",
-    "ia",
+    " ia ",
     "machine learning",
     "algoritmo",
     "dados de saúde",
     "dados em saúde",
+    "dados de saude",
+    "dados em saude",
     "analytics",
     "big data",
     "plataforma digital",
     "app de saúde",
+    "app de saude",
     "aplicativo de saúde",
+    "aplicativo de saude",
     "monitoramento remoto",
     "monitorização remota",
+    "monitorizacao remota",
     "atendimento virtual",
     "consulta virtual",
     "gestão de crônicos",
-    "gestão de cronicos",
+    "gestao de cronicos",
+    "gestão de crônicos",
 
     # Operadoras / mercado privado
     "operadora",
     "plano de saúde",
-    "planos de saúde",
     "plano de saude",
+    "planos de saúde",
     "planos de saude",
-    "ans ",
+    " ans ",
     "ans:",
     "sinistralidade",
     "autogestão",
     "autogestao",
     "coparticipação",
     "coparticipacao",
-    "seguros saúde",
     "seguro saúde",
+    "seguro saude",
+    "seguros saúde",
+    "seguros saude",
     "medicina de grupo",
 
     # Hospitais / provedores privados com viés de gestão/tecnologia
@@ -127,8 +130,6 @@ POSITIVE_KEYWORDS = [
     "habitos saudaveis",
 ]
 
-# Palavras que indicam que a notícia NÃO é adequada ao recorte
-# mesmo sendo “de saúde”.
 NEGATIVE_KEYWORDS = [
     # SUS / política pública generalista
     " sus ",
@@ -140,8 +141,11 @@ NEGATIVE_KEYWORDS = [
     "governador",
     "secretaria de saúde",
     "secretaria da saúde",
+    "secretaria de saude",
+    "secretaria da saude",
     "hospital municipal",
     "unidade básica de saúde",
+    "unidade basica de saude",
     "ubs ",
     "inaugura novas instalações",
     "inaugura novas instalacoes",
@@ -180,13 +184,11 @@ NEGATIVE_KEYWORDS = [
     "tomate, melancia e goiaba",
     "tomate, melancia, goiaba",
 
-    # Lifestyle muito genérico (NYTimes Well etc.)
+    # Lifestyle muito genérico
     "my therapist",
-    "melhor produto para cabelo",
     "thicker, healthier hair",
     "best products for thicker, healthier hair",
-    "pergunta ao colunista",
-    "pergunte ao colunista",
+    "melhores produtos para cabelo",
 
     # Conteúdo policial / tragédia
     "morte de criança",
@@ -200,22 +202,17 @@ NEGATIVE_KEYWORDS = [
 
 
 def is_relevant(text: str) -> bool:
-    """
-    Decide se uma notícia é ou não relevante para o recorte da News.
-    1) Se bater em qualquer NEGATIVE_KEYWORD => exclui.
-    2) Só entra se tiver ao menos 1 POSITIVE_KEYWORD.
-    """
     if not text:
         return False
 
     t = text.lower()
 
-    # Regra 1 – filtro negativo
+    # 1) filtro negativo
     for word in NEGATIVE_KEYWORDS:
         if word in t:
             return False
 
-    # Regra 2 – exige pelo menos 1 termo positivo
+    # 2) exige ao menos um termo positivo
     for word in POSITIVE_KEYWORDS:
         if word in t:
             return True
@@ -224,22 +221,15 @@ def is_relevant(text: str) -> bool:
 
 
 def compute_score(article: Article) -> float:
-    """
-    Score maior para temas centrais da Conexa:
-      - Telemedicina
-      - Saúde mental
-      - Operadoras / planos
-      - IA / dados
-    """
     title = article.title.lower()
     score = 0.0
 
-    # peso base por quantidade de positivos encontrados
+    # peso base por termos positivos
     for word in POSITIVE_KEYWORDS:
         if word in title:
             score += 1.0
 
-    # boosts específicos
+    # boosts principais
     if "telemedicina" in title or "atendimento virtual" in title:
         score += 6.0
 
@@ -259,14 +249,10 @@ def compute_score(article: Article) -> float:
 
 
 # ------------------------------
-# FETCH BÁSICO DE LINKS
+# FETCH DE LINKS
 # ------------------------------
 
 class LinkExtractor(HTMLParser):
-    """
-    Parser HTML simples para extrair <a href="">
-    """
-
     def __init__(self, base_url: str):
         super().__init__()
         self.base_url = base_url
@@ -319,12 +305,6 @@ def extract_domain(url: str) -> str:
 
 
 def fetch_articles_from_source(source: Source) -> List[Article]:
-    """
-    Estratégia simples:
-      - Buscar a URL principal da fonte (source.base_url)
-      - Extrair todos os links (anchor)
-      - Filtrar por relevância de título
-    """
     html = fetch_html(source.base_url)
     if not html:
         return []
@@ -334,24 +314,21 @@ def fetch_articles_from_source(source: Source) -> List[Article]:
 
     articles: List[Article] = []
     seen_urls = set()
-
     base_domain = extract_domain(source.base_url)
 
     for link in parser.links:
         href = link["href"]
         text = link["text"]
 
-        # manter apenas links internos do site
+        # apenas links internos
         if not href.startswith(base_domain):
             continue
 
-        # ignorar anchors repetidos / vazios
         if href in seen_urls:
             continue
 
-        # limpeza básica do título
         title = re.sub(r"\s+", " ", text).strip()
-        if len(title) < 25:  # evita títulos muito curtos tipo "Saiba mais"
+        if len(title) < 25:
             continue
 
         if not is_relevant(title):
@@ -370,15 +347,7 @@ def fetch_articles_from_source(source: Source) -> List[Article]:
     return articles
 
 
-# ------------------------------
-# FUNÇÕES PÚBLICAS DO MÓDULO
-# ------------------------------
-
 def fetch_all_articles() -> List[Article]:
-    """
-    Busca artigos em todas as fontes configuradas em sources.py
-    e aplica score de relevância.
-    """
     all_articles: List[Article] = []
 
     for section, sources in sources_by_section.items():
@@ -386,7 +355,7 @@ def fetch_all_articles() -> List[Article]:
             logger.info(f"Buscando notícias em {src.name} ({section})")
             try:
                 src_articles = fetch_articles_from_source(src)
-            except Exception as e:  # proteção extra para não quebrar o pipeline
+            except Exception as e:  # noqa: BLE001
                 logger.exception(f"Erro ao processar fonte {src.name}: {e}")
                 continue
 
@@ -394,16 +363,11 @@ def fetch_all_articles() -> List[Article]:
                 art.score = compute_score(art)
                 all_articles.append(art)
 
-    # ordena por score decrescente
     all_articles.sort(key=lambda a: a.score, reverse=True)
     return all_articles
 
 
 def group_articles_by_section(articles: List[Article]) -> Dict[str, List[Article]]:
-    """
-    Agrupa por seção, já assumindo que tudo aqui já passou por is_relevant().
-    Podemos fazer pequenos ajustes adicionais se necessário.
-    """
     grouped: Dict[str, List[Article]] = {
         SECTION_BRASIL: [],
         SECTION_MUNDO: [],
@@ -412,8 +376,7 @@ def group_articles_by_section(articles: List[Article]) -> Dict[str, List[Article
     }
 
     for art in articles:
-        # segurança: se por acaso apareceu algo com vacina infantil / SUS,
-        # ainda excluímos aqui (não deveria, mas é um "double check").
+        # dupla checagem de relevância
         if not is_relevant(art.title):
             continue
 
@@ -421,7 +384,7 @@ def group_articles_by_section(articles: List[Article]) -> Dict[str, List[Article
             grouped[art.section] = []
         grouped[art.section].append(art)
 
-    # mantém cada bloco limitado, para não ficar gigante
+    # limitar quantidade por seção
     for sec in grouped:
         grouped[sec] = grouped[sec][:20]
 
@@ -429,14 +392,20 @@ def group_articles_by_section(articles: List[Article]) -> Dict[str, List[Article
 
 
 def get_top_n(articles: List[Article], n: int = 5) -> List[Article]:
-    """
-    Top N do dia, independente da seção, ordenado por score.
-    """
     return sorted(articles, key=lambda a: a.score, reverse=True)[:n]
 
 
+def fetch_all_news() -> Dict[str, List[Article]]:
+    """
+    Função usada pelo main.py.
+    Retorna um dicionário { seção -> [Article, ...] } já filtrado e scoreado.
+    """
+    articles = fetch_all_articles()
+    sections = group_articles_by_section(articles)
+    return sections
+
+
 if __name__ == "__main__":
-    # para debug local rápido
     arts = fetch_all_articles()
     print(f"Total de artigos relevantes: {len(arts)}")
     for a in get_top_n(arts, 10):
