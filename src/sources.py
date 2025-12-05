@@ -3,7 +3,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Dict, List
 
-# Constantes de seção usadas em todo o pipeline
 SECTION_BRASIL = "brasil"
 SECTION_MUNDO = "mundo"
 SECTION_HEALTHTECHS = "healthtechs"
@@ -17,10 +16,6 @@ class Source:
     section: str
 
 
-# --------------------------------
-# BRASIL – SAÚDE & OPERADORAS
-# (foco: operadoras, hospitais privados, planos, gestão)
-# --------------------------------
 BRASIL_SOURCES: List[Source] = [
     Source(
         name="Medicina S/A",
@@ -52,17 +47,12 @@ BRASIL_SOURCES: List[Source] = [
         base_url="https://valor.globo.com/empresas/saude/",
         section=SECTION_BRASIL,
     ),
-    # Adicione aqui páginas específicas de operadoras / ANS caso deseje
 ]
 
 
-# --------------------------------
-# MUNDO – SAÚDE GLOBAL
-# (foco: sistemas de saúde, digital health, regulação, payers)
-# --------------------------------
 MUNDO_SOURCES: List[Source] = [
     Source(
-        name="STAT News – Health / AI / Policy",
+        name="STAT News",
         base_url="https://www.statnews.com/",
         section=SECTION_MUNDO,
     ),
@@ -86,8 +76,6 @@ MUNDO_SOURCES: List[Source] = [
         base_url="https://www.ft.com/health",
         section=SECTION_MUNDO,
     ),
-    # Healthbrew é mais “healthtech/insights”, mas como não tem seção separada,
-    # podemos tratar como global (ou mover para healthtechs se preferir)
     Source(
         name="Healthbrew",
         base_url="https://healthbrew.com/",
@@ -96,10 +84,6 @@ MUNDO_SOURCES: List[Source] = [
 ]
 
 
-# --------------------------------
-# HEALTHTECHS – BRASIL & MUNDO
-# (startups, big techs, IA, investimentos, modelos digitais)
-# --------------------------------
 HEALTHTECH_SOURCES: List[Source] = [
     Source(
         name="MobiHealthNews",
@@ -107,32 +91,28 @@ HEALTHTECH_SOURCES: List[Source] = [
         section=SECTION_HEALTHTECHS,
     ),
     Source(
-        name="Rock Health – News",
+        name="Rock Health – Insights",
         base_url="https://rockhealth.com/insights/",
         section=SECTION_HEALTHTECHS,
     ),
     Source(
-        name="Startup Health",
+        name="Startup Health – News",
         base_url="https://www.startuphealth.com/news",
         section=SECTION_HEALTHTECHS,
     ),
     Source(
-        name="Fierce Healthcare – Payers/Tech",
+        name="Fierce Healthcare – Payers",
         base_url="https://www.fiercehealthcare.com/payers",
         section=SECTION_HEALTHTECHS,
     ),
     Source(
-        name="STAT Plus – Digital / AI",
+        name="STAT News – AI/Digital",
         base_url="https://www.statnews.com/",
         section=SECTION_HEALTHTECHS,
     ),
 ]
 
 
-# --------------------------------
-# WELLNESS – EUA / EUROPA
-# (bem-estar, saúde mental, performance, hábitos, longevity)
-# --------------------------------
 WELLNESS_SOURCES: List[Source] = [
     Source(
         name="Fitt Insider",
@@ -157,7 +137,6 @@ WELLNESS_SOURCES: List[Source] = [
 ]
 
 
-# Dicionário principal usado pelo news_fetcher
 sources_by_section: Dict[str, List[Source]] = {
     SECTION_BRASIL: BRASIL_SOURCES,
     SECTION_MUNDO: MUNDO_SOURCES,
