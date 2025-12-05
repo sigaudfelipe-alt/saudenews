@@ -13,10 +13,6 @@ from sources import (
 
 
 def build_subject() -> str:
-    """
-    Assunto do e-mail da newsletter.
-    Ex.: "Principais notícias de Saúde – Brasil e Mundo · 05/12/2025"
-    """
     today = datetime.now()
     date_str = today.strftime("%d/%m/%Y")
     return f"Principais notícias de Saúde – Brasil e Mundo · {date_str}"
@@ -30,12 +26,7 @@ def _flatten(sections: Dict[str, List[Article]]) -> List[Article]:
 
 
 def render_html(sections: Dict[str, List[Article]]) -> str:
-    """
-    Gera o HTML final a partir do dicionário de seções retornado
-    por fetch_all_news().
-    """
     all_articles = _flatten(sections)
-    # Garantir que temos score (definido em news_fetcher)
     all_articles = sorted(all_articles, key=lambda a: a.score, reverse=True)
     top5 = all_articles[:5]
 
@@ -44,42 +35,53 @@ def render_html(sections: Dict[str, List[Article]]) -> str:
     healthtechs = sections.get(SECTION_HEALTHTECHS, [])
     wellness = sections.get(SECTION_WELLNESS, [])
 
-    # HTML simples, compatível com Brevo
+    today = datetime.now()
+    date_str = today.strftime("%d/%m/%Y")
+
     html_parts: List[str] = []
 
     html_parts.append('<html><head><meta charset="utf-8" /></head><body>')
+    # Título principal
     html_parts.append(
         '<h1 style="font-family: Arial, sans-serif; font-size: 22px; margin-bottom: 4px;">'
         "Principais notícias de Saúde – Brasil e Mundo"
         "</h1>"
     )
 
+    # Linha CURADORIA DIÁRIA similar ao layout antigo
+    html_parts.append(
+        f'<p style="font-family: Arial, sans-serif; font-size: 12px; color: #666; margin-top: 0;">'
+        f"CURADORIA DIÁRIA · {date_str}<br/>"
+        "Radar rápido de movimentos em operadoras, hospitais, planos de saúde, laboratórios, "
+        "healthtechs e tendências de bem-estar."
+        "</p>"
+    )
+
     # Top 5
     html_parts.append(
-        '<p style="font-family: Arial, sans-serif; font-size: 14px; margin-top: 0;">'
+        '<p style="font-family: Arial, sans-serif; font-size: 14px; margin-top: 12px; margin-bottom: 4px;">'
         "⭐ <strong>Top 5 do dia</strong><br/>"
         "Use estes destaques como ponto de partida para conversas com operadoras, hospitais, empregadores e parceiros."
         "</p>"
     )
-    html_parts.append('<ul style="font-family: Arial, sans-serif; font-size: 14px;">')
+    html_parts.append('<ul style="font-family: Arial, sans-serif; font-size: 14px; margin-top: 4px;">')
     for art in top5:
         html_parts.append(
             f'<li><a href="{art.url}" target="_blank">{art.title}</a> · {art.source_name}</li>'
         )
     html_parts.append("</ul>")
 
-    # Separador
     html_parts.append('<hr style="margin: 16px 0;" />')
 
     # 🇧🇷 Brasil – Saúde & Operadoras
     if brasil:
         html_parts.append(
-            '<h2 style="font-family: Arial, sans-serif; font-size: 18px;">'
+            '<h2 style="font-family: Arial, sans-serif; font-size: 18px; margin-bottom: 4px;">'
             "🇧🇷 Brasil – Saúde &amp; Operadoras"
             "</h2>"
         )
         html_parts.append(
-            '<p style="font-family: Arial, sans-serif; font-size: 13px;">'
+            '<p style="font-family: Arial, sans-serif; font-size: 13px; margin-top: 0;">'
             "Movimentos em operadoras, hospitais privados, laboratórios, planos de saúde e negócios em saúde."
             "</p>"
         )
@@ -96,12 +98,12 @@ def render_html(sections: Dict[str, List[Article]]) -> str:
     # 🌍 Mundo – Saúde Global
     if mundo:
         html_parts.append(
-            '<h2 style="font-family: Arial, sans-serif; font-size: 18px;">'
+            '<h2 style="font-family: Arial, sans-serif; font-size: 18px; margin-bottom: 4px;">'
             "🌍 Mundo – Saúde Global"
             "</h2>"
         )
         html_parts.append(
-            '<p style="font-family: Arial, sans-serif; font-size: 13px;">'
+            '<p style="font-family: Arial, sans-serif; font-size: 13px; margin-top: 0;">'
             "Sistemas de saúde, regulação, política de saúde e tendências digitais em grandes mercados."
             "</p>"
         )
@@ -118,12 +120,12 @@ def render_html(sections: Dict[str, List[Article]]) -> str:
     # 🚀 Healthtechs – Brasil & Mundo
     if healthtechs:
         html_parts.append(
-            '<h2 style="font-family: Arial, sans-serif; font-size: 18px;">'
+            '<h2 style="font-family: Arial, sans-serif; font-size: 18px; margin-bottom: 4px;">'
             "🚀 Healthtechs – Brasil &amp; Mundo"
             "</h2>"
         )
         html_parts.append(
-            '<p style="font-family: Arial, sans-serif; font-size: 13px;">'
+            '<p style="font-family: Arial, sans-serif; font-size: 13px; margin-top: 0;">'
             "Startups, big techs em saúde, IA, investimentos e modelos digitais."
             "</p>"
         )
@@ -140,12 +142,12 @@ def render_html(sections: Dict[str, List[Article]]) -> str:
     # 🧘‍♀️ Wellness – EUA / Europa
     if wellness:
         html_parts.append(
-            '<h2 style="font-family: Arial, sans-serif; font-size: 18px;">'
+            '<h2 style="font-family: Arial, sans-serif; font-size: 18px; margin-bottom: 4px;">'
             "🧘‍♀️ Wellness – EUA / Europa"
             "</h2>"
         )
         html_parts.append(
-            '<p style="font-family: Arial, sans-serif; font-size: 13px;">'
+            '<p style="font-family: Arial, sans-serif; font-size: 13px; margin-top: 0;">'
             "Bem-estar, saúde mental, performance, fitness e hábitos de longo prazo."
             "</p>"
         )
