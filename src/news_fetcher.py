@@ -131,8 +131,7 @@ POSITIVE_KEYWORDS = [
 ]
 
 NEGATIVE_KEYWORDS = [
-    # SUS / política pública generalista
-    " sus ",
+    # SUS / política pública generalista (mais específicos, sem bloquear "sus" inteiro)
     "prefeitura",
     "prefeito",
     "governo de",
@@ -149,6 +148,7 @@ NEGATIVE_KEYWORDS = [
     "ubs ",
     "inaugura novas instalações",
     "inaugura novas instalacoes",
+    "inaugura novo hospital",
     "obra no hospital",
     "licitação",
     "licitacao",
@@ -304,12 +304,12 @@ def _parse_date_from_text(text: str) -> Optional[date]:
 
 def is_recent(text: str, max_days: int = 1) -> bool:
     """
-    Considera recente se a data explícita no texto estiver em D0 ou D-1.
-    Se não acharmos data, por enquanto NÃO entra (estrito para respeitar D-1).
+    Se houver data explícita no título, aplica D-1.
+    Se não houver data, assume que é recente (para não matar Brasil/Mundo).
     """
     d = _parse_date_from_text(text)
     if not d:
-        return False
+        return True  # assume recente se não tiver data no anchor
 
     today = datetime.now().date()
     delta = (today - d).days
@@ -420,7 +420,6 @@ def fetch_articles_from_source(source: Source) -> List[Article]:
         href = link["href"]
         text = link["text"]
 
-        # apenas links internos
         if not href.startswith(base_domain):
             continue
 
@@ -486,7 +485,6 @@ def group_articles_by_section(articles: List[Article]) -> Dict[str, List[Article
             grouped[art.section] = []
         grouped[art.section].append(art)
 
-    # limitar quantidade por seção para não ficar gigante
     for sec in grouped:
         grouped[sec] = grouped[sec][:20]
 
@@ -498,10 +496,6 @@ def get_top_n(articles: List[Article], n: int = 5) -> List[Article]:
 
 
 def fetch_all_news() -> Dict[str, List[Article]]:
-    """
-    Função usada pelo main.py.
-    Retorna um dicionário { seção -> [Article, ...] }.
-    """
     articles = fetch_all_articles()
     sections = group_articles_by_section(articles)
     return sections
