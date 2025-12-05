@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import re
 from dataclasses import dataclass
+from datetime import datetime, date
 from html.parser import HTMLParser
 from typing import Dict, List, Optional
 from urllib.error import HTTPError, URLError
@@ -32,7 +33,7 @@ class Article:
 
 
 # ------------------------------
-# NOVA LÓGICA DE CURADORIA
+# CURADORIA
 # ------------------------------
 
 POSITIVE_KEYWORDS = [
@@ -68,7 +69,6 @@ POSITIVE_KEYWORDS = [
     "consulta virtual",
     "gestão de crônicos",
     "gestao de cronicos",
-    "gestão de crônicos",
 
     # Operadoras / mercado privado
     "operadora",
@@ -220,16 +220,110 @@ def is_relevant(text: str) -> bool:
     return False
 
 
+# ------------------------------
+# FILTRO DE DATA (D-1)
+# ------------------------------
+
+MONTHS_PT = {
+    "jan": 1,
+    "fev": 2,
+    "mar": 3,
+    "abr": 4,
+    "mai": 5,
+    "jun": 6,
+    "jul": 7,
+    "ago": 8,
+    "set": 9,
+    "out": 10,
+    "nov": 11,
+    "dez": 12,
+}
+
+MONTHS_EN = {
+    "jan": 1,
+    "january": 1,
+    "feb": 2,
+    "february": 2,
+    "mar": 3,
+    "march": 3,
+    "apr": 4,
+    "april": 4,
+    "may": 5,
+    "jun": 6,
+    "june": 6,
+    "jul": 7,
+    "july": 7,
+    "aug": 8,
+    "august": 8,
+    "sep": 9,
+    "sept": 9,
+    "september": 9,
+    "oct": 10,
+    "october": 10,
+    "nov": 11,
+    "november": 11,
+    "dec": 12,
+    "december": 12,
+}
+
+
+def _parse_date_from_text(text: str) -> Optional[date]:
+    t = text.lower()
+
+    # Formato PT: 2.dez.2025
+    m = re.search(r"(\d{1,2})\.(jan|fev|mar|abr|mai|jun|jul|ago|set|out|nov|dez)\.(\d{4})", t)
+    if m:
+        day = int(m.group(1))
+        month = MONTHS_PT[m.group(2)]
+        year = int(m.group(3))
+        return date(year, month, day)
+
+    # Formato numérico: 02.12.2025
+    m = re.search(r"(\d{1,2})\.(\d{1,2})\.(\d{4})", t)
+    if m:
+        day = int(m.group(1))
+        month = int(m.group(2))
+        year = int(m.group(3))
+        return date(year, month, day)
+
+    # Inglês: December 4, 2025 / Dec. 4, 2025
+    m = re.search(
+        r"(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|"
+        r"sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\.?\s+(\d{1,2}),\s+(\d{4})",
+        t,
+    )
+    if m:
+        month_name = m.group(1)
+        day = int(m.group(2))
+        year = int(m.group(3))
+        month = MONTHS_EN[month_name]
+        return date(year, month, day)
+
+    return None
+
+
+def is_recent(text: str, max_days: int = 1) -> bool:
+    """
+    Considera recente se a data explícita no texto estiver em D0 ou D-1.
+    Se não acharmos data, por enquanto NÃO entra (estrito para respeitar D-1).
+    """
+    d = _parse_date_from_text(text)
+    if not d:
+        return False
+
+    today = datetime.now().date()
+    delta = (today - d).days
+    return 0 <= delta <= max_days
+
+
 def compute_score(article: Article) -> float:
     title = article.title.lower()
     score = 0.0
 
-    # peso base por termos positivos
     for word in POSITIVE_KEYWORDS:
         if word in title:
             score += 1.0
 
-    # boosts principais
     if "telemedicina" in title or "atendimento virtual" in title:
         score += 6.0
 
@@ -251,6 +345,9 @@ def compute_score(article: Article) -> float:
 # ------------------------------
 # FETCH DE LINKS
 # ------------------------------
+
+MAX_ARTICLES_PER_SOURCE = 3
+
 
 class LinkExtractor(HTMLParser):
     def __init__(self, base_url: str):
@@ -317,6 +414,9 @@ def fetch_articles_from_source(source: Source) -> List[Article]:
     base_domain = extract_domain(source.base_url)
 
     for link in parser.links:
+        if len(articles) >= MAX_ARTICLES_PER_SOURCE:
+            break
+
         href = link["href"]
         text = link["text"]
 
@@ -332,6 +432,9 @@ def fetch_articles_from_source(source: Source) -> List[Article]:
             continue
 
         if not is_relevant(title):
+            continue
+
+        if not is_recent(title, max_days=1):
             continue
 
         seen_urls.add(href)
@@ -376,7 +479,6 @@ def group_articles_by_section(articles: List[Article]) -> Dict[str, List[Article
     }
 
     for art in articles:
-        # dupla checagem de relevância
         if not is_relevant(art.title):
             continue
 
@@ -384,7 +486,7 @@ def group_articles_by_section(articles: List[Article]) -> Dict[str, List[Article
             grouped[art.section] = []
         grouped[art.section].append(art)
 
-    # limitar quantidade por seção
+    # limitar quantidade por seção para não ficar gigante
     for sec in grouped:
         grouped[sec] = grouped[sec][:20]
 
@@ -398,7 +500,7 @@ def get_top_n(articles: List[Article], n: int = 5) -> List[Article]:
 def fetch_all_news() -> Dict[str, List[Article]]:
     """
     Função usada pelo main.py.
-    Retorna um dicionário { seção -> [Article, ...] } já filtrado e scoreado.
+    Retorna um dicionário { seção -> [Article, ...] }.
     """
     articles = fetch_all_articles()
     sections = group_articles_by_section(articles)
