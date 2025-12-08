@@ -166,12 +166,20 @@ def render_html(sections: Dict[str, List[Article]]) -> str:
         html_parts.append("</ul>")
         html_parts.append('<hr style="margin: 16px 0;" />')
 
-    # CTA de inscrição (se a URL estiver configurada)
+    # CTA de inscrição - sempre mostra algum CTA
     if CTA_URL:
         html_parts.append(
             f'<p style="font-family: Arial, sans-serif; font-size: 13px; margin-top: 24px;">'
             'Quer receber esta curadoria diariamente por e-mail?<br/>'
             f'<a href="{CTA_URL}" target="_blank"><strong>👉 Clique aqui para se inscrever na News Saúde</strong></a>.'
+            "</p>"
+        )
+    else:
+        # CTA sem link (caso NEWS_CTA_URL não esteja configurada)
+        html_parts.append(
+            '<p style="font-family: Arial, sans-serif; font-size: 13px; margin-top: 24px;">'
+            'Quer receber esta curadoria diariamente por e-mail?<br/>'
+            '<strong>👉 Responda este e-mail pedindo sua inclusão na lista da News Saúde.</strong>'
             "</p>"
         )
 
