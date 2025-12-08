@@ -128,6 +128,17 @@ POSITIVE_KEYWORDS = [
     "habito saudavel",
     "hábitos saudáveis",
     "habitos saudaveis",
+
+    # Prescrição eletrônica / Memed / e-prescription
+    "prescrição eletrônica",
+    "prescricao eletronica",
+    "prescrição digital",
+    "prescricao digital",
+    "receita digital",
+    "receituário digital",
+    "receituario digital",
+    "plataforma de prescrição",
+    "plataforma de prescricao",
 ]
 
 NEGATIVE_KEYWORDS = [
@@ -198,6 +209,19 @@ NEGATIVE_KEYWORDS = [
     "assassinato",
     "violência",
     "violencia",
+
+    # Doenças específicas que não queremos (prostata)
+    "câncer de próstata",
+    "cancer de prostata",
+    "próstata",
+    "prostata",
+
+    # Farmacêutica corporativa que não é foco
+    "indústria farmacêutica",
+    "industria farmaceutica",
+    " farmacêutica",
+    " farmaceutica",
+    " ems ",
 ]
 
 
@@ -302,14 +326,28 @@ def _parse_date_from_text(text: str) -> Optional[date]:
     return None
 
 
-def is_recent(text: str, max_days: int = 1) -> bool:
+def _parse_date_from_url(url: str) -> Optional[date]:
     """
-    Se houver data explícita no título, aplica D-1.
-    Se não houver data, assume que é recente (para não matar Brasil/Mundo).
+    Captura datas no formato /YYYY/MM/DD/ em URLs (ex: Valor, O Globo etc.).
     """
-    d = _parse_date_from_text(text)
+    m = re.search(r"/(20\d{2})/(\d{1,2})/(\d{1,2})/", url)
+    if not m:
+        return None
+    year = int(m.group(1))
+    month = int(m.group(2))
+    day = int(m.group(3))
+    return date(year, month, day)
+
+
+def is_recent_from_any(text: str, url: str, max_days: int = 1) -> bool:
+    """
+    Tenta achar a data no texto OU na URL.
+    Se achar, aplica D-1.
+    Se não achar nada, assume recente (para não matar fontes que não expõem data no anchor).
+    """
+    d = _parse_date_from_text(text) or _parse_date_from_url(url)
     if not d:
-        return True  # assume recente se não tiver data no anchor
+        return True
 
     today = datetime.now().date()
     delta = (today - d).days
@@ -335,6 +373,10 @@ def compute_score(article: Article) -> float:
 
     if "inteligência artificial" in title or "inteligencia artificial" in title or " ia " in title:
         score += 4.0
+
+    # Prescrição eletrônica / digital – dar um bônus
+    if "prescrição eletrônica" in title or "prescricao eletronica" in title or "receita digital" in title:
+        score += 3.0
 
     if article.section == SECTION_HEALTHTECHS:
         score += 2.0
@@ -401,6 +443,19 @@ def extract_domain(url: str) -> str:
     return f"{parsed.scheme}://{parsed.netloc}"
 
 
+# URLs que não queremos NUNCA (conteúdo antigo / branded que já se repetiu)
+URL_BLACKLIST_SUBSTR = [
+    "medicinasa.com.br/conexa-assefaz",
+    "medicinasa.com.br/noa-notes",
+    "medicinasa.com.br/noa-notes-recursos",
+]
+
+
+def is_blacklisted_url(url: str) -> bool:
+    u = url.lower()
+    return any(pattern in u for pattern in URL_BLACKLIST_SUBSTR)
+
+
 def fetch_articles_from_source(source: Source) -> List[Article]:
     html = fetch_html(source.base_url)
     if not html:
@@ -426,6 +481,9 @@ def fetch_articles_from_source(source: Source) -> List[Article]:
         if href in seen_urls:
             continue
 
+        if is_blacklisted_url(href):
+            continue
+
         title = re.sub(r"\s+", " ", text).strip()
         if len(title) < 25:
             continue
@@ -433,7 +491,8 @@ def fetch_articles_from_source(source: Source) -> List[Article]:
         if not is_relevant(title):
             continue
 
-        if not is_recent(title, max_days=1):
+        # Filtro D-1 considerando também a data na URL
+        if not is_recent_from_any(title, href, max_days=1):
             continue
 
         seen_urls.add(href)
@@ -470,6 +529,10 @@ def fetch_all_articles() -> List[Article]:
 
 
 def group_articles_by_section(articles: List[Article]) -> Dict[str, List[Article]]:
+    """
+    Agrupa por seção com trava global de URL:
+    - mesma matéria NUNCA aparece em duas seções (evita repetição Mundo/Healthtechs).
+    """
     grouped: Dict[str, List[Article]] = {
         SECTION_BRASIL: [],
         SECTION_MUNDO: [],
@@ -477,14 +540,22 @@ def group_articles_by_section(articles: List[Article]) -> Dict[str, List[Article
         SECTION_WELLNESS: [],
     }
 
+    seen_urls = set()
+
     for art in articles:
         if not is_relevant(art.title):
             continue
+
+        if art.url in seen_urls:
+            # já colocamos essa URL em alguma seção, não repetir
+            continue
+        seen_urls.add(art.url)
 
         if art.section not in grouped:
             grouped[art.section] = []
         grouped[art.section].append(art)
 
+    # Limite de segurança por seção
     for sec in grouped:
         grouped[sec] = grouped[sec][:20]
 
