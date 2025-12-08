@@ -3,7 +3,7 @@ name: News Saúde - Daily Run
 on:
   schedule:
     # Ajuste o horário se quiser (UTC):
-    # Ex: 10:00 UTC = 07:00 em São Paulo (horário padrão, sem horário de verão)
+    # Ex: 10:00 UTC = 07:00 em São Paulo (sem horário de verão)
     - cron: "0 10 * * 1-5"   # segunda a sexta às 10:00 UTC
   workflow_dispatch: {}       # permite rodar manualmente pelo GitHub
 
@@ -13,8 +13,6 @@ jobs:
 
     env:
       # Modo de execução (usado em send_email.py)
-      # - "schedule"          quando rodar pelo cron
-      # - "workflow_dispatch" quando rodar manualmente
       RUN_MODE: ${{ github.event_name }}
 
       # Secrets da Brevo
@@ -32,7 +30,7 @@ jobs:
       # URL do CTA de inscrição (Substack, formulário da Brevo etc.)
       NEWS_CTA_URL: ${{ secrets.NEWS_CTA_URL }}
 
-      # Se você usar OpenAI ou outra API, inclua aqui também:
+      # Se você usar OpenAI ou outra API
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 
     steps:
@@ -44,6 +42,12 @@ jobs:
         with:
           python-version: "3.11"
 
+      # Passo opcional de debug, ajuda a confirmar onde está o main.py
+      - name: Show repo structure
+        run: |
+          pwd
+          ls -R
+
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
@@ -53,4 +57,4 @@ jobs:
 
       - name: Run newsletter pipeline
         run: |
-          python main.py
+          python src/main.py
