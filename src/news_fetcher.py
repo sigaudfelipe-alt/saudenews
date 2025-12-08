@@ -210,7 +210,7 @@ NEGATIVE_KEYWORDS = [
     "violência",
     "violencia",
 
-    # Doenças específicas que não queremos (prostata)
+    # Doenças específicas que não queremos (próstata)
     "câncer de próstata",
     "cancer de prostata",
     "próstata",
@@ -221,7 +221,6 @@ NEGATIVE_KEYWORDS = [
     "industria farmaceutica",
     " farmacêutica",
     " farmaceutica",
-    " ems ",
 ]
 
 
@@ -339,19 +338,45 @@ def _parse_date_from_url(url: str) -> Optional[date]:
     return date(year, month, day)
 
 
-def is_recent_from_any(text: str, url: str, max_days: int = 1) -> bool:
-    """
-    Tenta achar a data no texto OU na URL.
-    Se achar, aplica D-1.
-    Se não achar nada, assume recente (para não matar fontes que não expõem data no anchor).
-    """
-    d = _parse_date_from_text(text) or _parse_date_from_url(url)
-    if not d:
-        return True
+def fetch_html(url: str, timeout: int = 15) -> Optional[str]:
+    try:
+        req = Request(
+            url,
+            headers={"User-Agent": "Mozilla/5.0 (NewsSaudeBot)"},
+        )
+        with urlopen(req, timeout=timeout) as resp:
+            charset = resp.headers.get_content_charset() or "utf-8"
+            return resp.read().decode(charset, errors="ignore")
+    except (HTTPError, URLError, TimeoutError) as e:
+        logger.warning(f"Erro ao buscar {url}: {e}")
+        return None
 
+
+def is_recent_with_article_fetch(title: str, url: str, max_days: int = 1) -> bool:
+    """
+    Verifica se a notícia é recente (D-1), tentando em 3 passos:
+    1) Data no título ou na URL
+    2) Data dentro da página da matéria (HTML)
+    3) Se nada for encontrado, assume recente
+    """
     today = datetime.now().date()
-    delta = (today - d).days
-    return 0 <= delta <= max_days
+
+    # 1) Título + URL
+    d = _parse_date_from_text(title) or _parse_date_from_url(url)
+    if d:
+        delta = (today - d).days
+        return 0 <= delta <= max_days
+
+    # 2) Conteúdo da página
+    html = fetch_html(url)
+    if html:
+        d2 = _parse_date_from_text(html) or _parse_date_from_url(url)
+        if d2:
+            delta = (today - d2).days
+            return 0 <= delta <= max_days
+
+    # 3) Fallback: não achou data em lugar nenhum
+    return True
 
 
 def compute_score(article: Article) -> float:
@@ -424,20 +449,6 @@ class LinkExtractor(HTMLParser):
             self.current_text_parts = []
 
 
-def fetch_html(url: str, timeout: int = 15) -> Optional[str]:
-    try:
-        req = Request(
-            url,
-            headers={"User-Agent": "Mozilla/5.0 (NewsSaudeBot)"},
-        )
-        with urlopen(req, timeout=timeout) as resp:
-            charset = resp.headers.get_content_charset() or "utf-8"
-            return resp.read().decode(charset, errors="ignore")
-    except (HTTPError, URLError, TimeoutError) as e:
-        logger.warning(f"Erro ao buscar {url}: {e}")
-        return None
-
-
 def extract_domain(url: str) -> str:
     parsed = urlparse(url)
     return f"{parsed.scheme}://{parsed.netloc}"
@@ -491,8 +502,8 @@ def fetch_articles_from_source(source: Source) -> List[Article]:
         if not is_relevant(title):
             continue
 
-        # Filtro D-1 considerando também a data na URL
-        if not is_recent_from_any(title, href, max_days=1):
+        # Filtro D-1 (título/URL +, se necessário, página da matéria)
+        if not is_recent_with_article_fetch(title, href, max_days=1):
             continue
 
         seen_urls.add(href)
