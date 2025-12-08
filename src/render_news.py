@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from datetime import datetime
 from typing import Dict, List
 
@@ -10,6 +11,10 @@ from sources import (
     SECTION_HEALTHTECHS,
     SECTION_WELLNESS,
 )
+
+# URL do formulário de inscrição na News Saúde (Brevo, Substack etc.)
+# Defina em GitHub Secrets/Actions como NEWS_CTA_URL
+CTA_URL = os.getenv("NEWS_CTA_URL", "").strip()
 
 
 def build_subject() -> str:
@@ -160,6 +165,15 @@ def render_html(sections: Dict[str, List[Article]]) -> str:
             )
         html_parts.append("</ul>")
         html_parts.append('<hr style="margin: 16px 0;" />')
+
+    # CTA de inscrição (se a URL estiver configurada)
+    if CTA_URL:
+        html_parts.append(
+            f'<p style="font-family: Arial, sans-serif; font-size: 13px; margin-top: 24px;">'
+            'Quer receber esta curadoria diariamente por e-mail?<br/>'
+            f'<a href="{CTA_URL}" target="_blank"><strong>👉 Clique aqui para se inscrever na News Saúde</strong></a>.'
+            "</p>"
+        )
 
     # Rodapé
     html_parts.append(
