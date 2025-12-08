@@ -1,39 +1,56 @@
-name: Run Newsletter
+name: News Saúde - Daily Run
 
 on:
   schedule:
-    # 09h00 no horário de Brasília (UTC-3) ≈ 12h UTC
-    - cron: "0 12 * * 1-5"   # apenas segunda a sexta
-  workflow_dispatch:
+    # Ajuste o horário se quiser (UTC):
+    # Ex: 10:00 UTC = 07:00 em São Paulo (horário padrão, sem horário de verão)
+    - cron: "0 10 * * 1-5"   # segunda a sexta às 10:00 UTC
+  workflow_dispatch: {}       # permite rodar manualmente pelo GitHub
 
 jobs:
-  run:
+  run-news:
     runs-on: ubuntu-latest
+
+    env:
+      # Modo de execução (usado em send_email.py)
+      # - "schedule"          quando rodar pelo cron
+      # - "workflow_dispatch" quando rodar manualmente
+      RUN_MODE: ${{ github.event_name }}
+
+      # Secrets da Brevo
+      BREVO_API_KEY: ${{ secrets.BREVO_API_KEY }}
+      BREVO_SENDER_EMAIL: ${{ secrets.BREVO_SENDER_EMAIL }}
+      BREVO_SENDER_NAME: ${{ secrets.BREVO_SENDER_NAME }}
+
+      # Destinatários diretos (fallback quando não usamos listas)
+      TO_EMAILS: ${{ secrets.TO_EMAILS }}
+      TO_EMAILS_MANUAL: ${{ secrets.TO_EMAILS_MANUAL }}
+
+      # IDs de lista da Brevo (ex: "12" ou "12,34")
+      BREVO_LIST_IDS: ${{ secrets.BREVO_LIST_IDS }}
+
+      # URL do CTA de inscrição (Substack, formulário da Brevo etc.)
+      NEWS_CTA_URL: ${{ secrets.NEWS_CTA_URL }}
+
+      # Se você usar OpenAI ou outra API, inclua aqui também:
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Python
+      - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
       - name: Install dependencies
-        run: pip install -r requirements.txt
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then
+            pip install -r requirements.txt
+          fi
 
-      - name: Run script
-        env:
-          # Brevo (API v3)
-          BREVO_API_KEY: ${{ secrets.BREVO_API_KEY }}
-          BREVO_SENDER_EMAIL: ${{ secrets.BREVO_SENDER_EMAIL }}
-          BREVO_SENDER_NAME: ${{ secrets.BREVO_SENDER_NAME }}
-          BREVO_LIST_ID: ${{ secrets.BREVO_LIST_ID }}
-
-          # E-mail(s) para teste manual (Run workflow)
-          TO_EMAILS_MANUAL: ${{ secrets.TO_EMAILS_MANUAL }}
-
-          # Modo de execução: 'workflow_dispatch' (manual) ou 'schedule' (cron)
-          RUN_MODE: ${{ github.event_name }}
-
-        run: python src/main.py
+      - name: Run newsletter pipeline
+        run: |
+          python main.py
