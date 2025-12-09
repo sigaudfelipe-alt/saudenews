@@ -49,6 +49,22 @@ def _get_env(name: str, default: str | None = None, required: bool = False) -> s
     return value or ""
 
 
+def _validate_emails(emails: List[str]) -> List[str]:
+    """Remove vazios e valida formato básico de e-mail."""
+    cleaned = [e.strip() for e in emails if e and e.strip()]
+    if not cleaned:
+        raise RuntimeError("Recipients list is empty after parsing TO_EMAILS/TO_EMAILS_MANUAL")
+
+    invalid = [
+        e for e in cleaned
+        if "@" not in e or "." not in e.split("@")[-1]
+    ]
+    if invalid:
+        raise RuntimeError(f"Invalid recipient emails in TO_EMAILS/TO_EMAILS_MANUAL: {invalid}")
+
+    return cleaned
+
+
 def _resolve_recipients() -> List[str]:
     """
     Decide a lista de destinatários usando RUN_MODE quando NÃO estamos usando listas da Brevo.
@@ -66,11 +82,8 @@ def _resolve_recipients() -> List[str]:
     if not raw:
         raise RuntimeError("No recipients configured: set TO_EMAILS and/or TO_EMAILS_MANUAL")
 
-    emails = [e.strip() for e in raw.split(",") if e.strip()]
-    if not emails:
-        raise RuntimeError("Recipients list is empty after parsing TO_EMAILS/TO_EMAILS_MANUAL")
-
-    return emails
+    emails = raw.split(",")
+    return _validate_emails(emails)
 
 
 def _parse_list_ids() -> List[int]:
