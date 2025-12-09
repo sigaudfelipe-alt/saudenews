@@ -2,9 +2,9 @@ name: News Saúde - Daily Run
 
 on:
   schedule:
-    # Ajuste o horário se quiser (UTC):
-    # Ex: 10:00 UTC = 07:00 em São Paulo (sem horário de verão)
-    - cron: "0 10 * * 1-5"   # segunda a sexta às 10:00 UTC
+    # Horário em UTC:
+    # 12:00 UTC = 09:00 em São Paulo (sem horário de verão)
+    - cron: "0 12 * * 1-5"   # segunda a sexta às 12:00 UTC
   workflow_dispatch: {}       # permite rodar manualmente pelo GitHub
 
 jobs:
