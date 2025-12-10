@@ -4,12 +4,13 @@ on:
   # Disparo automático: seg–sex às 16:00 BRT (19:00 UTC)
   schedule:
     - cron: "0 19 * * 1-5"
-  # Permite rodar manualmente
+  # Permite rodar manualmente pelo botão "Run workflow"
   workflow_dispatch:
 
 jobs:
   run-saude-news:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
