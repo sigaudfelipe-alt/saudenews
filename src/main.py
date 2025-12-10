@@ -33,7 +33,8 @@ def main() -> None:
     subject = build_subject()
 
     logger.info("Enviando e-mail da newsletter via Brevo API...")
-    send_email(subject=subject, html_body=html)
+    # >>> correção: assinatura do send_email(html, subject)
+    send_email(html=html, subject=subject)
 
     logger.info("Newsletter enviada com sucesso.")
 
