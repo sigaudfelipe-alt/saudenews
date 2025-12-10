@@ -91,67 +91,73 @@ def _fetch_emails_from_brevo_list(api_key: str, list_id: int) -> List[str]:
 
 
 def send_email(html: str, subject: str) -> None:
+    """Envie a newsletter combinando destinatários manuais e da lista da Brevo.
+
+    A lógica considera dois conjuntos de destinatários:
+      * TO_EMAILS_MANUAL – lista de e-mails separados por vírgula para envios
+        de teste. Estes serão sempre incluídos, não anulam os demais destinatários.
+      * TO_EMAILS – pode ser uma lista estática de e-mails ou o ID de uma lista
+        da Brevo. Quando for um ID numérico, todos os contatos dessa lista serão
+        buscados via API.
+
+    Todos os destinatários coletados são combinados em um único conjunto sem
+    duplicados. Se nenhum destinatário for encontrado, levanta um RuntimeError.
+    """
     api_key = os.environ["BREVO_API_KEY"]
     sender_email = os.environ["BREVO_SENDER_EMAIL"]
     sender_name = os.environ.get("BREVO_SENDER_NAME", "Saúde News")
 
-    # 1) MODO TESTE: TO_EMAILS_MANUAL (tem prioridade se estiver preenchido)
+    recipients: List[str] = []
+
+    # 1) Coleta destinatários manuais (para cópias/testes)
     manual_raw = os.environ.get("TO_EMAILS_MANUAL", "").strip()
-    manual_emails = _parse_and_validate_emails(manual_raw) if manual_raw else []
-
-    if manual_emails:
-        recipients = manual_emails
+    if manual_raw:
+        manual_emails = _parse_and_validate_emails(manual_raw)
+        recipients.extend(manual_emails)
         logger.info(
-            "Usando TO_EMAILS_MANUAL para envio de teste (%d destinatários)...",
-            len(recipients),
+            "Encontrados %d destinatários em TO_EMAILS_MANUAL.", len(manual_emails)
         )
-    else:
-        # 2) PRODUÇÃO: TO_EMAILS
-        #    - Se tiver '@' -> tratamos como lista fixa de e-mails
-        #    - Se NÃO tiver '@' -> tratamos como ID de lista da Brevo
-        to_raw = os.environ.get("TO_EMAILS", "").strip()
 
-        static_emails: List[str] = []
-        brevo_list_id: int | None = None
-
-        if to_raw:
-            if "@" in to_raw:
-                # lista fixa de e-mails
-                static_emails = _parse_and_validate_emails(to_raw)
-                logger.info(
-                    "Usando TO_EMAILS como lista estática (%d destinatários)...",
-                    len(static_emails),
-                )
-            else:
-                # ID de lista da Brevo
-                try:
-                    brevo_list_id = int(to_raw)
-                except ValueError:
-                    raise RuntimeError(
-                        "TO_EMAILS deve ser OU uma lista de e-mails "
-                        "(a@b.com,b@c.com) OU o ID numérico de uma lista da Brevo."
-                    )
-        else:
-            raise RuntimeError(
-                "Nenhum destinatário configurado. "
-                "Use TO_EMAILS_MANUAL para testes ou TO_EMAILS como "
-                "lista de e-mails / ID de lista da Brevo."
+    # 2) Coleta destinatários configurados em TO_EMAILS
+    to_raw = os.environ.get("TO_EMAILS", "").strip()
+    if to_raw:
+        if "@" in to_raw:
+            # Lista fixa de e-mails
+            static_emails = _parse_and_validate_emails(to_raw)
+            recipients.extend(static_emails)
+            logger.info(
+                "Encontrados %d destinatários em TO_EMAILS estático.",
+                len(static_emails),
             )
-
-        if brevo_list_id is not None:
+        else:
+            # ID de lista da Brevo
+            try:
+                brevo_list_id = int(to_raw)
+            except ValueError:
+                raise RuntimeError(
+                    "TO_EMAILS deve ser OU uma lista de e-mails "
+                    "(a@b.com,b@c.com) OU o ID numérico de uma lista da Brevo."
+                )
             logger.info("Buscando contatos na lista da Brevo ID %s...", brevo_list_id)
-            recipients = _fetch_emails_from_brevo_list(api_key, brevo_list_id)
-            if not recipients:
+            list_emails = _fetch_emails_from_brevo_list(api_key, brevo_list_id)
+            if not list_emails:
                 raise RuntimeError(
                     f"Nenhum contato encontrado na lista Brevo {brevo_list_id}."
                 )
+            recipients.extend(list_emails)
             logger.info(
                 "Encontrados %d contatos na lista Brevo %s.",
-                len(recipients),
+                len(list_emails),
                 brevo_list_id,
             )
-        else:
-            recipients = static_emails
+
+    if not recipients:
+        raise RuntimeError(
+            "Nenhum destinatário configurado. Defina TO_EMAILS e/ou TO_EMAILS_MANUAL."
+        )
+
+    # Remove duplicados preservando ordem
+    recipients = list(dict.fromkeys(recipients))
 
     # Monta payload de envio
     headers = {
@@ -168,7 +174,8 @@ def send_email(html: str, subject: str) -> None:
     }
 
     logger.info(
-        "Enviando newsletter via Brevo para %d destinatários...", len(recipients)
+        "Enviando newsletter via Brevo para %d destinatários combinados...",
+        len(recipients),
     )
     resp = requests.post(
         BREVO_EMAIL_URL, headers=headers, data=json.dumps(payload), timeout=30
