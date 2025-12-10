@@ -1,16 +1,15 @@
 name: Run Saúde News
 
 on:
-  # Disparo automático: seg–sex às 12:00 (Brasília) ≈ 15:00 UTC
+  # Disparo automático: seg–sex às 16:00 BRT (19:00 UTC)
   schedule:
-    - cron: "0 15 * * 1-5"
-  # Permite rodar manualmente pelo botão "Run workflow"
+    - cron: "0 19 * * 1-5"
+  # Permite rodar manualmente
   workflow_dispatch:
 
 jobs:
   run-saude-news:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
@@ -28,19 +27,11 @@ jobs:
       - name: Run Saúde News
         working-directory: ./src
         env:
-          # Chave da OpenAI (se o news_fetcher usar IA)
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-
-          # Configuração Brevo
           BREVO_API_KEY: ${{ secrets.BREVO_API_KEY }}
           BREVO_SENDER_EMAIL: ${{ secrets.BREVO_SENDER_EMAIL }}
           BREVO_SENDER_NAME: ${{ secrets.BREVO_SENDER_NAME }}
-
-          # Lista automática / testes
-          TO_EMAILS: ${{ secrets.TO_EMAILS }}            # ID da lista da Brevo OU lista fixa
-          TO_EMAILS_MANUAL: ${{ secrets.TO_EMAILS_MANUAL }}  # para testes
-
-          # CTA da news (formulário, Substack etc.)
+          TO_EMAILS: ${{ secrets.TO_EMAILS }}
+          TO_EMAILS_MANUAL: ${{ secrets.TO_EMAILS_MANUAL }}
           NEWS_CTA_URL: ${{ secrets.NEWS_CTA_URL }}
-        run: |
-          python main.py
+        run: python main.py
