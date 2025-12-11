@@ -1,7 +1,7 @@
 name: Run Saúde News
 
 on:
-  # Disparo automático: seg–sex às 16:00 BRT (19:00 UTC)
+  # Disparo automático: seg–sex às 10:00 BRT (13:00 UTC)
   schedule:
     - cron: "0 13 * * 1-5"
   # Permite rodar manualmente pelo botão "Run workflow"
