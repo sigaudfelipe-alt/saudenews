@@ -29,8 +29,29 @@ def main() -> None:
     sections = fetch_all_news()
 
     # Remove artigos da fonte 'Folha Equilibrio Saude' (sem relevância)
+    # e artigos muito antigos (anos anteriores ao limite).
+    from datetime import datetime
+
+    current_year = datetime.now().year
+    # Permitimos notícias dos últimos 2 anos além do ano corrente.
+    # Por exemplo, em 2025 aceitamos 2023, 2024 e 2025.
+    valid_years = {str(y) for y in range(current_year - 2, current_year + 1)}
+
+    def _is_valid_article(art) -> bool:
+        # Exclui fonte Folha Equilibrio Saude
+        if getattr(art, "source_name", "").lower() == "folha equilibrio saude":
+            return False
+        url = getattr(art, "url", "")
+        # Exclui artigos muito antigos com ano no caminho da URL
+        # Verificamos segmentos do tipo /yyyy/
+        for yr in valid_years:
+            if f"/{yr}/" in url:
+                return True
+        # Se não houver ano na URL, assume válido (pode ser data dinâmica)
+        return True
+
     for sec, arts in sections.items():
-        sections[sec] = [art for art in arts if getattr(art, "source_name", "").lower() != "folha equilibrio saude"]
+        sections[sec] = [art for art in arts if _is_valid_article(art)]
 
     logger.info("Renderizando HTML da newsletter...")
     html = render_html(sections)
