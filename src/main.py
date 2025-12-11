@@ -28,12 +28,16 @@ def main() -> None:
     logger.info("Buscando notícias nas fontes configuradas...")
     sections = fetch_all_news()
 
+    # Remove artigos da fonte 'Folha Equilibrio Saude' (sem relevância)
+    for sec, arts in sections.items():
+        sections[sec] = [art for art in arts if getattr(art, "source_name", "").lower() != "folha equilibrio saude"]
+
     logger.info("Renderizando HTML da newsletter...")
     html = render_html(sections)
     subject = build_subject()
 
     logger.info("Enviando e-mail da newsletter via Brevo API...")
-    # >>> correção: assinatura do send_email(html, subject)
+    # Correção da assinatura: send_email(html, subject)
     send_email(html=html, subject=subject)
 
     logger.info("Newsletter enviada com sucesso.")
