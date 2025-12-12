@@ -30,15 +30,49 @@ def _flatten(sections: Dict[str, List[Article]]) -> List[Article]:
     return flat
 
 
-def render_html(sections: Dict[str, List[Article]]) -> str:
-    all_articles = _flatten(sections)
-    all_articles = sorted(all_articles, key=lambda a: a.score, reverse=True)
-    top5 = all_articles[:5]
+def _pick_top5_with_brasil_min2(
+    all_articles: List[Article],
+    brasil: List[Article],
+    min_brasil: int = 2,
+) -> List[Article]:
+    all_sorted = sorted(all_articles, key=lambda a: a.score, reverse=True)
+    br_sorted = sorted(brasil, key=lambda a: a.score, reverse=True)
 
+    chosen: List[Article] = []
+    chosen_urls = set()
+
+    # 1) garante mínimo de Brasil (se houver)
+    for art in br_sorted:
+        if len(chosen) >= min_brasil:
+            break
+        if art.url in chosen_urls:
+            continue
+        chosen.append(art)
+        chosen_urls.add(art.url)
+
+    # 2) completa o Top 5 com o ranking geral
+    for art in all_sorted:
+        if len(chosen) >= 5:
+            break
+        if art.url in chosen_urls:
+            continue
+        chosen.append(art)
+        chosen_urls.add(art.url)
+
+    return chosen[:5]
+
+
+def render_html(sections: Dict[str, List[Article]]) -> str:
     brasil = sections.get(SECTION_BRASIL, [])
     mundo = sections.get(SECTION_MUNDO, [])
     healthtechs = sections.get(SECTION_HEALTHTECHS, [])
     wellness = sections.get(SECTION_WELLNESS, [])
+
+    all_articles = _flatten(sections)
+    all_articles = sorted(all_articles, key=lambda a: a.score, reverse=True)
+
+    # (PONTO 3) Top 5 com mínimo 2 Brasil (quando houver)
+    top5 = _pick_top5_with_brasil_min2(all_articles, brasil, min_brasil=2)
 
     today = datetime.now()
     date_str = today.strftime("%d/%m/%Y")
@@ -46,6 +80,7 @@ def render_html(sections: Dict[str, List[Article]]) -> str:
     html_parts: List[str] = []
 
     html_parts.append('<html><head><meta charset="utf-8" /></head><body>')
+
     # Título principal
     html_parts.append(
         '<h1 style="font-family: Arial, sans-serif; font-size: 22px; margin-bottom: 4px;">'
@@ -90,9 +125,7 @@ def render_html(sections: Dict[str, List[Article]]) -> str:
             "Movimentos em operadoras, hospitais privados, laboratórios, planos de saúde e negócios em saúde."
             "</p>"
         )
-        html_parts.append(
-            '<ul style="font-family: Arial, sans-serif; font-size: 14px;">'
-        )
+        html_parts.append('<ul style="font-family: Arial, sans-serif; font-size: 14px;">')
         for art in brasil:
             html_parts.append(
                 f'<li><a href="{art.url}" target="_blank">{art.title}</a> · {art.source_name}</li>'
@@ -112,9 +145,7 @@ def render_html(sections: Dict[str, List[Article]]) -> str:
             "Sistemas de saúde, regulação, política de saúde e tendências digitais em grandes mercados."
             "</p>"
         )
-        html_parts.append(
-            '<ul style="font-family: Arial, sans-serif; font-size: 14px;">'
-        )
+        html_parts.append('<ul style="font-family: Arial, sans-serif; font-size: 14px;">')
         for art in mundo:
             html_parts.append(
                 f'<li><a href="{art.url}" target="_blank">{art.title}</a> · {art.source_name}</li>'
@@ -134,9 +165,7 @@ def render_html(sections: Dict[str, List[Article]]) -> str:
             "Startups, big techs em saúde, IA, investimentos e modelos digitais."
             "</p>"
         )
-        html_parts.append(
-            '<ul style="font-family: Arial, sans-serif; font-size: 14px;">'
-        )
+        html_parts.append('<ul style="font-family: Arial, sans-serif; font-size: 14px;">')
         for art in healthtechs:
             html_parts.append(
                 f'<li><a href="{art.url}" target="_blank">{art.title}</a> · {art.source_name}</li>'
@@ -156,9 +185,7 @@ def render_html(sections: Dict[str, List[Article]]) -> str:
             "Bem-estar, saúde mental, performance, fitness e hábitos de longo prazo."
             "</p>"
         )
-        html_parts.append(
-            '<ul style="font-family: Arial, sans-serif; font-size: 14px;">'
-        )
+        html_parts.append('<ul style="font-family: Arial, sans-serif; font-size: 14px;">')
         for art in wellness:
             html_parts.append(
                 f'<li><a href="{art.url}" target="_blank">{art.title}</a> · {art.source_name}</li>'
