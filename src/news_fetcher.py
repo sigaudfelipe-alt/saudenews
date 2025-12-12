@@ -33,10 +33,11 @@ class Article:
 
 
 # ------------------------------
-# CURADORIA (reaproveita o seu modelo)
+# CURADORIA
 # ------------------------------
 
 POSITIVE_KEYWORDS = [
+    # Digital health / tecnologia
     "telemedicina",
     "teleatendimento",
     "saúde digital",
@@ -68,6 +69,8 @@ POSITIVE_KEYWORDS = [
     "consulta virtual",
     "gestão de crônicos",
     "gestao de cronicos",
+
+    # Operadoras / mercado privado
     "operadora",
     "plano de saúde",
     "plano de saude",
@@ -85,12 +88,16 @@ POSITIVE_KEYWORDS = [
     "seguros saúde",
     "seguros saude",
     "medicina de grupo",
+
+    # Hospitais / provedores privados com viés de gestão/tecnologia
     "hospital",
     "rede hospitalar",
     "gestão hospitalar",
     "gestao hospitalar",
     "acreditação",
     "acreditacao",
+
+    # Saúde mental
     "saúde mental",
     "saude mental",
     "burnout",
@@ -102,6 +109,8 @@ POSITIVE_KEYWORDS = [
     "bets",
     "jogo on-line",
     "jogo online",
+
+    # Wellness / longevity / performance
     "wellness",
     "longevity",
     "longevidade",
@@ -119,6 +128,8 @@ POSITIVE_KEYWORDS = [
     "habito saudavel",
     "hábitos saudáveis",
     "habitos saudaveis",
+
+    # Prescrição eletrônica / Memed / e-prescription
     "prescrição eletrônica",
     "prescricao eletronica",
     "prescrição digital",
@@ -131,6 +142,7 @@ POSITIVE_KEYWORDS = [
 ]
 
 NEGATIVE_KEYWORDS = [
+    # SUS / política pública generalista (mais específicos, sem bloquear "sus" inteiro)
     "prefeitura",
     "prefeito",
     "governo de",
@@ -145,14 +157,13 @@ NEGATIVE_KEYWORDS = [
     "unidade básica de saúde",
     "unidade basica de saude",
     "ubs ",
-    "inaugura novas instalações",
-    "inaugura novas instalacoes",
-    "inaugura novo hospital",
     "obra no hospital",
     "licitação",
     "licitacao",
     "concurso público",
     "concurso publico",
+
+    # Vacina / política de imunização genérica e polarizada
     "vacina contra hepatite",
     "vacina contra a hepatite",
     "cdc vaccine",
@@ -169,6 +180,8 @@ NEGATIVE_KEYWORDS = [
     "rfk jr",
     "kennedy’s methodical",
     "kennedy's methodical",
+
+    # Nutrição generalista / culinária
     "veja quais alimentos",
     "alimentos que ajudam",
     "receita de",
@@ -176,12 +189,14 @@ NEGATIVE_KEYWORDS = [
     "cozinhar",
     "cozinha",
     "salada",
-    "tomate, melancia e goiaba",
-    "tomate, melancia, goiaba",
+
+    # Lifestyle muito genérico
     "my therapist",
     "thicker, healthier hair",
     "best products for thicker, healthier hair",
     "melhores produtos para cabelo",
+
+    # Conteúdo policial / tragédia
     "morte de criança",
     "morre criança",
     "morre paciente",
@@ -189,10 +204,14 @@ NEGATIVE_KEYWORDS = [
     "assassinato",
     "violência",
     "violencia",
+
+    # Doenças específicas que não queremos (próstata)
     "câncer de próstata",
     "cancer de prostata",
     "próstata",
     "prostata",
+
+    # Farmacêutica corporativa que não é foco
     "indústria farmacêutica",
     "industria farmaceutica",
     " farmacêutica",
@@ -203,80 +222,24 @@ NEGATIVE_KEYWORDS = [
 def is_relevant(text: str) -> bool:
     if not text:
         return False
+
     t = text.lower()
 
+    # 1) filtro negativo
     for word in NEGATIVE_KEYWORDS:
         if word in t:
             return False
 
-    return any(word in t for word in POSITIVE_KEYWORDS)
+    # 2) exige ao menos um termo positivo
+    for word in POSITIVE_KEYWORDS:
+        if word in t:
+            return True
 
-
-# ------------------------------
-# BLOQUEIOS (novos)
-# ------------------------------
-
-# Remover “hubs”, páginas institucionais e páginas repetidas/sem conteúdo
-URL_BLOCKLIST_SUBSTR = [
-    # Saúde Digital News (CTA repetido)
-    "saudedigitalnews.com.br/receba-saude-digital-news-no-seu-e-mail",
-    # O Globo hubs / tags / assunto
-    "oglobo.globo.com/tudo-sobre/",
-    "/tudo-sobre/",
-    "/assunto/",
-    "/tag/",
-    # Medicina S/A – páginas evergreen que já apareceram antigas
-    "medicinasa.com.br/conexa-edi",
-    "medicinasa.com.br/unip-longevidade",
-    "medicinasa.com.br/conexa-assefaz",
-    "medicinasa.com.br/noa-notes",
-    "medicinasa.com.br/noa-notes-recursos",
-]
-
-TITLE_BLOCKLIST_SUBSTR = [
-    "receba saúde digital news",
-    "receba saude digital news",
-    "saiba mais sobre",
-]
-
-BLOCKED_DOMAINS_SUBSTR = [
-    # Bloqueio hard de Folha Equilíbrio (mesmo se alguém reintroduzir fonte)
-    "folha.uol.com.br/equilibrio",
-    "folha.uol.com.br/equilibrioesaude",
-]
-
-
-def is_blacklisted(url: str, title: str) -> bool:
-    u = (url or "").lower()
-    t = (title or "").lower()
-
-    if any(d in u for d in BLOCKED_DOMAINS_SUBSTR):
-        return True
-    if any(p in u for p in URL_BLOCKLIST_SUBSTR):
-        return True
-    if any(p in t for p in TITLE_BLOCKLIST_SUBSTR):
-        return True
     return False
 
 
-def normalize_amp_url(url: str) -> str:
-    """
-    Normaliza URLs AMP (ex.: Bloomberg via cdn.ampproject.org).
-    """
-    if not url:
-        return url
-    u = url.strip()
-    if "cdn.ampproject.org" in u:
-        parsed = urlparse(u)
-        qs = parse_qs(parsed.query)
-        if "url" in qs and qs["url"]:
-            return unquote(qs["url"][0])
-    # fallback simples para /amp/
-    return u.replace("/amp/", "/")
-
-
 # ------------------------------
-# FILTRO DE DATA (D-1 / D-2)
+# FILTRO DE DATA (D-1)
 # ------------------------------
 
 MONTHS_PT = {
@@ -323,11 +286,9 @@ MONTHS_EN = {
 
 
 def _parse_date_from_text(text: str) -> Optional[date]:
-    if not text:
-        return None
     t = text.lower()
 
-    # PT: 2.dez.2025
+    # Formato PT: 2.dez.2025
     m = re.search(r"(\d{1,2})\.(jan|fev|mar|abr|mai|jun|jul|ago|set|out|nov|dez)\.(\d{4})", t)
     if m:
         day = int(m.group(1))
@@ -335,7 +296,7 @@ def _parse_date_from_text(text: str) -> Optional[date]:
         year = int(m.group(3))
         return date(year, month, day)
 
-    # Numérico: 02.12.2025
+    # Formato numérico: 02.12.2025
     m = re.search(r"(\d{1,2})\.(\d{1,2})\.(\d{4})", t)
     if m:
         day = int(m.group(1))
@@ -343,15 +304,7 @@ def _parse_date_from_text(text: str) -> Optional[date]:
         year = int(m.group(3))
         return date(year, month, day)
 
-    # ISO: 2025-12-11
-    m = re.search(r"(20\d{2})-(\d{2})-(\d{2})", t)
-    if m:
-        year = int(m.group(1))
-        month = int(m.group(2))
-        day = int(m.group(3))
-        return date(year, month, day)
-
-    # EN: December 4, 2025 / Dec. 4, 2025
+    # Inglês: December 4, 2025 / Dec. 4, 2025
     m = re.search(
         r"(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|"
         r"sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\.?\s+(\d{1,2}),\s+(\d{4})",
@@ -369,10 +322,8 @@ def _parse_date_from_text(text: str) -> Optional[date]:
 
 def _parse_date_from_url(url: str) -> Optional[date]:
     """
-    Captura datas no formato /YYYY/MM/DD/ em URLs.
+    Captura datas no formato /YYYY/MM/DD/ em URLs (ex: Valor, O Globo etc.).
     """
-    if not url:
-        return None
     m = re.search(r"/(20\d{2})/(\d{1,2})/(\d{1,2})/", url)
     if not m:
         return None
@@ -396,21 +347,40 @@ def fetch_html(url: str, timeout: int = 15) -> Optional[str]:
         return None
 
 
-def is_recent_with_article_fetch(title: str, url: str, max_days: int = 2) -> bool:
+def normalize_amp_url(url: str) -> str:
     """
-    ✅ NOVO COMPORTAMENTO:
-    - Data é obrigatória.
-    - Se não encontrar data em lugar nenhum -> DESCARTA.
+    Normaliza URLs AMP:
+    - cdn.ampproject.org -> tenta extrair parâmetro ?url=
+    - /amp/ -> remove (quando aplicável)
+    """
+    if not url:
+        return url
+
+    if "cdn.ampproject.org" in url:
+        parsed = urlparse(url)
+        qs = parse_qs(parsed.query)
+        if "url" in qs and qs["url"]:
+            return unquote(qs["url"][0])
+
+    return url.replace("/amp/", "/")
+
+
+def is_recent_with_article_fetch(title: str, url: str, max_days: int = 1) -> bool:
+    """
+    Verifica se a notícia é recente (D-1), tentando em 3 passos:
+    1) Data no título ou na URL
+    2) Data dentro da página da matéria (HTML)
+    3) Se nada for encontrado, REPROVA (evita evergreen/sem data)
     """
     today = datetime.now().date()
 
-    # 1) título + URL
+    # 1) Título + URL
     d = _parse_date_from_text(title) or _parse_date_from_url(url)
     if d:
         delta = (today - d).days
         return 0 <= delta <= max_days
 
-    # 2) conteúdo da página
+    # 2) Conteúdo da página
     html = fetch_html(url)
     if html:
         d2 = _parse_date_from_text(html) or _parse_date_from_url(url)
@@ -418,18 +388,23 @@ def is_recent_with_article_fetch(title: str, url: str, max_days: int = 2) -> boo
             delta = (today - d2).days
             return 0 <= delta <= max_days
 
-    # 3) não achou data -> descarta
+    # 3) Fallback: não achou data em lugar nenhum => NÃO PUBLICA
     return False
 
 
 def compute_score(article: Article) -> float:
     title = (article.title or "").lower()
+    url = (article.url or "").lower()
+    source = (article.source_name or "").lower()
+
     score = 0.0
 
+    # Base por palavras positivas
     for word in POSITIVE_KEYWORDS:
         if word in title:
             score += 1.0
 
+    # Bônus temáticos (mantém lógica atual)
     if "telemedicina" in title or "atendimento virtual" in title:
         score += 6.0
 
@@ -445,6 +420,39 @@ def compute_score(article: Article) -> float:
     if "prescrição eletrônica" in title or "prescricao eletronica" in title or "receita digital" in title:
         score += 3.0
 
+    # =========================
+    # (PONTO 1) Penalizar “inauguração” e afins (editorialmente fraco)
+    # =========================
+    LOW_VALUE_TERMS = [
+        "inaugura",
+        "inauguração",
+        "inauguracao",
+        "abre novo",
+        "abertura de",
+        "novo pronto atendimento",
+        "novo centro",
+        "novos centros",
+        "centro de infusão",
+        "centro de infusao",
+        "unidade inaugurada",
+    ]
+    for term in LOW_VALUE_TERMS:
+        if term in title:
+            score -= 3.0
+
+    # =========================
+    # (PONTO 2) Boost business health BR
+    # =========================
+    if "bloomberglinea" in url or "bloomberg.com" in url:
+        score += 7.0
+    if "neofeed" in url:
+        score += 6.0
+    if "exame.com" in url:
+        score += 5.0
+    if "valor.globo.com" in url or "valor" in source:
+        score += 4.0
+
+    # Bônus por seção
     if article.section == SECTION_HEALTHTECHS:
         score += 2.0
 
@@ -456,6 +464,43 @@ def compute_score(article: Article) -> float:
 # ------------------------------
 
 MAX_ARTICLES_PER_SOURCE = 3
+
+# URLs que não queremos NUNCA (conteúdo antigo / branded / institucional repetido)
+URL_BLACKLIST_SUBSTR = [
+    # Medicina S/A branded / antigos que voltam sempre
+    "medicinasa.com.br/conexa-assefaz",
+    "medicinasa.com.br/conexa-edi31",
+    "medicinasa.com.br/unip-longevidade",
+    "medicinasa.com.br/noa-notes",
+    "medicinasa.com.br/noa-notes-recursos",
+
+    # Saúde Digital News institucional “receba…”
+    "saudedigitalnews.com.br/receba",
+
+    # O Globo “tudo sobre / assunto”
+    "oglobo.globo.com/tudo-sobre/",
+]
+
+# Palavras de URL que quase sempre significam página institucional/tag/categoria
+URL_BLOCKLIST_KEYWORDS = [
+    "receba",
+    "assine",
+    "newsletter",
+    "tudo-sobre",
+    "assunto",
+    "/tag/",
+    "/tags/",
+    "/sobre",
+]
+
+
+def is_blacklisted_url(url: str) -> bool:
+    u = (url or "").lower()
+    if any(pattern in u for pattern in URL_BLACKLIST_SUBSTR):
+        return True
+    if any(k in u for k in URL_BLOCKLIST_KEYWORDS):
+        return True
+    return False
 
 
 class LinkExtractor(HTMLParser):
@@ -480,7 +525,7 @@ class LinkExtractor(HTMLParser):
 
     def handle_data(self, data):
         if self.current_href:
-            self.current_text_parts.append((data or "").strip())
+            self.current_text_parts.append(data.strip())
 
     def handle_endtag(self, tag):
         if tag == "a" and self.current_href:
@@ -512,30 +557,29 @@ def fetch_articles_from_source(source: Source) -> List[Article]:
         if len(articles) >= MAX_ARTICLES_PER_SOURCE:
             break
 
-        href = normalize_amp_url(link["href"])
+        href_raw = link["href"]
         text = link["text"]
 
-        # só links do próprio domínio da fonte
+        href = normalize_amp_url(href_raw)
+
         if not href.startswith(base_domain):
             continue
 
         if href in seen_urls:
             continue
 
-        title = re.sub(r"\s+", " ", (text or "")).strip()
+        if is_blacklisted_url(href):
+            continue
+
+        title = re.sub(r"\s+", " ", text).strip()
         if len(title) < 25:
             continue
 
-        # bloqueios gerais (URL/título)
-        if is_blacklisted(href, title):
-            continue
-
-        # curadoria por relevância
         if not is_relevant(title):
             continue
 
-        # data obrigatória + D-2
-        if not is_recent_with_article_fetch(title, href, max_days=2):
+        # Filtro D-1 (título/URL +, se necessário, página da matéria)
+        if not is_recent_with_article_fetch(title, href, max_days=1):
             continue
 
         seen_urls.add(href)
@@ -564,10 +608,6 @@ def fetch_all_articles() -> List[Article]:
                 continue
 
             for art in src_articles:
-                # bloqueio hard (caso fonte volte)
-                if is_blacklisted(art.url, art.title):
-                    continue
-
                 art.score = compute_score(art)
                 all_articles.append(art)
 
@@ -576,6 +616,10 @@ def fetch_all_articles() -> List[Article]:
 
 
 def group_articles_by_section(articles: List[Article]) -> Dict[str, List[Article]]:
+    """
+    Agrupa por seção com trava global de URL:
+    - mesma matéria NUNCA aparece em duas seções (evita repetição Mundo/Healthtechs).
+    """
     grouped: Dict[str, List[Article]] = {
         SECTION_BRASIL: [],
         SECTION_MUNDO: [],
@@ -593,21 +637,29 @@ def group_articles_by_section(articles: List[Article]) -> Dict[str, List[Article
             continue
         seen_urls.add(art.url)
 
-        grouped.setdefault(art.section, []).append(art)
+        if art.section not in grouped:
+            grouped[art.section] = []
+        grouped[art.section].append(art)
 
+    # Limite de segurança por seção
     for sec in grouped:
         grouped[sec] = grouped[sec][:20]
 
     return grouped
 
 
+def get_top_n(articles: List[Article], n: int = 5) -> List[Article]:
+    return sorted(articles, key=lambda a: a.score, reverse=True)[:n]
+
+
 def fetch_all_news() -> Dict[str, List[Article]]:
     articles = fetch_all_articles()
-    return group_articles_by_section(articles)
+    sections = group_articles_by_section(articles)
+    return sections
 
 
 if __name__ == "__main__":
     arts = fetch_all_articles()
     print(f"Total de artigos relevantes: {len(arts)}")
-    for a in arts[:10]:
+    for a in get_top_n(arts, 10):
         print(f"- ({a.section}) [{a.score:.1f}] {a.title} -> {a.url}")
