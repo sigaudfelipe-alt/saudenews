@@ -129,7 +129,7 @@ POSITIVE_KEYWORDS = [
     "hábitos saudáveis",
     "habitos saudaveis",
 
-    # Prescrição eletrônica / Memed / e-prescription
+    # Prescrição eletrônica
     "prescrição eletrônica",
     "prescricao eletronica",
     "prescrição digital",
@@ -142,7 +142,7 @@ POSITIVE_KEYWORDS = [
 ]
 
 NEGATIVE_KEYWORDS = [
-    # SUS / política pública generalista (mais específicos, sem bloquear "sus" inteiro)
+    # Política pública generalista / ruído
     "prefeitura",
     "prefeito",
     "governo de",
@@ -163,39 +163,6 @@ NEGATIVE_KEYWORDS = [
     "concurso público",
     "concurso publico",
 
-    # Vacina / política de imunização genérica e polarizada
-    "vacina contra hepatite",
-    "vacina contra a hepatite",
-    "cdc vaccine",
-    "cdc ",
-    "acip",
-    "hepatite b",
-    "sarampo",
-    "pólio",
-    "polio",
-    "campanha de vacinação",
-    "campanha de vacinacao",
-    "imunização infantil",
-    "imunizacao infantil",
-    "rfk jr",
-    "kennedy’s methodical",
-    "kennedy's methodical",
-
-    # Nutrição generalista / culinária
-    "veja quais alimentos",
-    "alimentos que ajudam",
-    "receita de",
-    "como preparar",
-    "cozinhar",
-    "cozinha",
-    "salada",
-
-    # Lifestyle muito genérico
-    "my therapist",
-    "thicker, healthier hair",
-    "best products for thicker, healthier hair",
-    "melhores produtos para cabelo",
-
     # Conteúdo policial / tragédia
     "morte de criança",
     "morre criança",
@@ -205,17 +172,27 @@ NEGATIVE_KEYWORDS = [
     "violência",
     "violencia",
 
-    # Doenças específicas que não queremos (próstata)
+    # Nutrição/casa (muito genérico)
+    "receita de",
+    "como preparar",
+    "cozinhar",
+    "cozinha",
+    "salada",
+
+    # Polarização vacinas genéricas
+    "cdc ",
+    "acip",
+    "sarampo",
+    "pólio",
+    "polio",
+    "campanha de vacinação",
+    "campanha de vacinacao",
+
+    # Foco fora (próstata)
     "câncer de próstata",
     "cancer de prostata",
     "próstata",
     "prostata",
-
-    # Farmacêutica corporativa que não é foco
-    "indústria farmacêutica",
-    "industria farmaceutica",
-    " farmacêutica",
-    " farmaceutica",
 ]
 
 
@@ -225,120 +202,84 @@ def is_relevant(text: str) -> bool:
 
     t = text.lower()
 
-    # 1) filtro negativo
     for word in NEGATIVE_KEYWORDS:
         if word in t:
             return False
 
-    # 2) exige ao menos um termo positivo
-    for word in POSITIVE_KEYWORDS:
-        if word in t:
-            return True
-
-    return False
+    return any(word in t for word in POSITIVE_KEYWORDS)
 
 
 # ------------------------------
-# FILTRO DE DATA (D-1)
+# DATA (D-1 / D-2 por seção)
 # ------------------------------
 
 MONTHS_PT = {
-    "jan": 1,
-    "fev": 2,
-    "mar": 3,
-    "abr": 4,
-    "mai": 5,
-    "jun": 6,
-    "jul": 7,
-    "ago": 8,
-    "set": 9,
-    "out": 10,
-    "nov": 11,
-    "dez": 12,
+    "jan": 1, "fev": 2, "mar": 3, "abr": 4, "mai": 5, "jun": 6,
+    "jul": 7, "ago": 8, "set": 9, "out": 10, "nov": 11, "dez": 12,
 }
-
 MONTHS_EN = {
-    "jan": 1,
-    "january": 1,
-    "feb": 2,
-    "february": 2,
-    "mar": 3,
-    "march": 3,
-    "apr": 4,
-    "april": 4,
+    "jan": 1, "january": 1,
+    "feb": 2, "february": 2,
+    "mar": 3, "march": 3,
+    "apr": 4, "april": 4,
     "may": 5,
-    "jun": 6,
-    "june": 6,
-    "jul": 7,
-    "july": 7,
-    "aug": 8,
-    "august": 8,
-    "sep": 9,
-    "sept": 9,
-    "september": 9,
-    "oct": 10,
-    "october": 10,
-    "nov": 11,
-    "november": 11,
-    "dec": 12,
-    "december": 12,
+    "jun": 6, "june": 6,
+    "jul": 7, "july": 7,
+    "aug": 8, "august": 8,
+    "sep": 9, "sept": 9, "september": 9,
+    "oct": 10, "october": 10,
+    "nov": 11, "november": 11,
+    "dec": 12, "december": 12,
 }
 
 
 def _parse_date_from_text(text: str) -> Optional[date]:
+    if not text:
+        return None
     t = text.lower()
 
-    # Formato PT: 2.dez.2025
+    # PT: 2.dez.2025
     m = re.search(r"(\d{1,2})\.(jan|fev|mar|abr|mai|jun|jul|ago|set|out|nov|dez)\.(\d{4})", t)
     if m:
-        day = int(m.group(1))
-        month = MONTHS_PT[m.group(2)]
-        year = int(m.group(3))
-        return date(year, month, day)
+        return date(int(m.group(3)), MONTHS_PT[m.group(2)], int(m.group(1)))
 
-    # Formato numérico: 02.12.2025
+    # Numérico: 02.12.2025
     m = re.search(r"(\d{1,2})\.(\d{1,2})\.(\d{4})", t)
     if m:
-        day = int(m.group(1))
-        month = int(m.group(2))
-        year = int(m.group(3))
-        return date(year, month, day)
+        return date(int(m.group(3)), int(m.group(2)), int(m.group(1)))
 
-    # Inglês: December 4, 2025 / Dec. 4, 2025
+    # ISO: 2025-12-11
+    m = re.search(r"(20\d{2})-(\d{2})-(\d{2})", t)
+    if m:
+        return date(int(m.group(1)), int(m.group(2)), int(m.group(3)))
+
+    # EN: Dec 4, 2025 / December 4, 2025
     m = re.search(
         r"(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|"
         r"sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\.?\s+(\d{1,2}),\s+(\d{4})",
         t,
     )
     if m:
-        month_name = m.group(1)
+        month = MONTHS_EN[m.group(1)]
         day = int(m.group(2))
         year = int(m.group(3))
-        month = MONTHS_EN[month_name]
         return date(year, month, day)
 
     return None
 
 
 def _parse_date_from_url(url: str) -> Optional[date]:
-    """
-    Captura datas no formato /YYYY/MM/DD/ em URLs (ex: Valor, O Globo etc.).
-    """
+    if not url:
+        return None
     m = re.search(r"/(20\d{2})/(\d{1,2})/(\d{1,2})/", url)
     if not m:
         return None
-    year = int(m.group(1))
-    month = int(m.group(2))
-    day = int(m.group(3))
-    return date(year, month, day)
+    return date(int(m.group(1)), int(m.group(2)), int(m.group(3)))
 
 
 def fetch_html(url: str, timeout: int = 15) -> Optional[str]:
     try:
-        req = Request(
-            url,
-            headers={"User-Agent": "Mozilla/5.0 (NewsSaudeBot)"},
-        )
+        req = Request(url, headers={"User-Agent": "Mozilla/5.0 (NewsSaudeBot)"})
         with urlopen(req, timeout=timeout) as resp:
             charset = resp.headers.get_content_charset() or "utf-8"
             return resp.read().decode(charset, errors="ignore")
@@ -348,11 +289,6 @@ def fetch_html(url: str, timeout: int = 15) -> Optional[str]:
 
 
 def normalize_amp_url(url: str) -> str:
-    """
-    Normaliza URLs AMP:
-    - cdn.ampproject.org -> tenta extrair parâmetro ?url=
-    - /amp/ -> remove (quando aplicável)
-    """
     if not url:
         return url
 
@@ -365,22 +301,20 @@ def normalize_amp_url(url: str) -> str:
     return url.replace("/amp/", "/")
 
 
-def is_recent_with_article_fetch(title: str, url: str, max_days: int = 1) -> bool:
+def is_recent_with_article_fetch(title: str, url: str, max_days: int) -> bool:
     """
-    Verifica se a notícia é recente (D-1), tentando em 3 passos:
-    1) Data no título ou na URL
-    2) Data dentro da página da matéria (HTML)
-    3) Se nada for encontrado, REPROVA (evita evergreen/sem data)
+    Data é obrigatória:
+    - tenta achar em título/URL
+    - se não achou, busca no HTML do artigo
+    - se ainda não achou -> REPROVA (evita evergreen/sem data)
     """
     today = datetime.now().date()
 
-    # 1) Título + URL
     d = _parse_date_from_text(title) or _parse_date_from_url(url)
     if d:
         delta = (today - d).days
         return 0 <= delta <= max_days
 
-    # 2) Conteúdo da página
     html = fetch_html(url)
     if html:
         d2 = _parse_date_from_text(html) or _parse_date_from_url(url)
@@ -388,8 +322,38 @@ def is_recent_with_article_fetch(title: str, url: str, max_days: int = 1) -> boo
             delta = (today - d2).days
             return 0 <= delta <= max_days
 
-    # 3) Fallback: não achou data em lugar nenhum => NÃO PUBLICA
     return False
+
+
+# ------------------------------
+# SCORE (estratégico > evento físico)
+# ------------------------------
+
+STRATEGIC_TERMS = {
+    # M&A / investimentos
+    "aquisição": 7.0, "aquisicao": 7.0, "compra": 6.0, "fusão": 7.0, "fusao": 7.0,
+    "m&a": 7.0, "merge": 6.0, "acquire": 6.0, "acquisition": 6.0,
+    "capta": 6.0, "captação": 6.0, "captacao": 6.0, "rodada": 6.0,
+    "investimento": 5.0, "investidor": 5.0, "venture": 5.0, "funding": 5.0,
+
+    # Estratégia comercial / produto
+    "assinatura": 6.0, "subscription": 6.0, "lança": 5.0, "lanca": 5.0,
+    "lançamento": 5.0, "lancamento": 5.0, "expansão": 6.0, "expansao": 6.0,
+    "parceria": 6.0, "joint venture": 7.0, "contrato": 5.0, "acordo": 5.0,
+    "modelo": 4.0, "precificação": 4.0, "precificacao": 4.0, "marketplace": 4.0,
+
+    # Regulação / operadoras
+    "ans": 6.0, "rn": 5.0, "norma": 5.0, "regulação": 5.0, "regulacao": 5.0,
+    "plano de saúde": 5.0, "plano de saude": 5.0, "operadora": 5.0,
+    "sinistralidade": 5.0, "coparticipação": 4.0, "coparticipacao": 4.0,
+}
+
+PHYSICAL_EVENT_TERMS = {
+    "inaugura": -5.0, "inauguração": -5.0, "inauguracao": -5.0,
+    "abre novo": -4.0, "abertura": -3.0, "cerimônia": -3.0, "cerimonia": -3.0,
+    "evento": -3.0, "congresso": -3.0, "feira": -3.0, "seminário": -3.0, "seminario": -3.0,
+    "workshop": -3.0, "prêmio": -3.0, "premio": -3.0, "premiação": -3.0, "premiacao": -3.0,
+}
 
 
 def compute_score(article: Article) -> float:
@@ -404,45 +368,23 @@ def compute_score(article: Article) -> float:
         if word in title:
             score += 1.0
 
-    # Bônus temáticos (mantém lógica atual)
+    # Bônus temáticos “core”
     if "telemedicina" in title or "atendimento virtual" in title:
         score += 6.0
-
     if "saúde mental" in title or "saude mental" in title or "bets" in title:
         score += 5.0
-
-    if "operadora" in title or "plano de saúde" in title or "plano de saude" in title:
-        score += 5.0
-
     if "inteligência artificial" in title or "inteligencia artificial" in title or " ia " in title:
         score += 4.0
 
-    if "prescrição eletrônica" in title or "prescricao eletronica" in title or "receita digital" in title:
-        score += 3.0
-
-    # =========================
-    # (PONTO 1) Penalizar “inauguração” e afins (editorialmente fraco)
-    # =========================
-    LOW_VALUE_TERMS = [
-        "inaugura",
-        "inauguração",
-        "inauguracao",
-        "abre novo",
-        "abertura de",
-        "novo pronto atendimento",
-        "novo centro",
-        "novos centros",
-        "centro de infusão",
-        "centro de infusao",
-        "unidade inaugurada",
-    ]
-    for term in LOW_VALUE_TERMS:
+    # (pedido) Estratégico > evento físico
+    for term, w in STRATEGIC_TERMS.items():
         if term in title:
-            score -= 3.0
+            score += w
+    for term, w in PHYSICAL_EVENT_TERMS.items():
+        if term in title:
+            score += w
 
-    # =========================
-    # (PONTO 2) Boost business health BR
-    # =========================
+    # Boost veículos business (quando existirem nas fontes)
     if "bloomberglinea" in url or "bloomberg.com" in url:
         score += 7.0
     if "neofeed" in url:
@@ -452,7 +394,7 @@ def compute_score(article: Article) -> float:
     if "valor.globo.com" in url or "valor" in source:
         score += 4.0
 
-    # Bônus por seção
+    # seção healthtech costuma ter bom sinal
     if article.section == SECTION_HEALTHTECHS:
         score += 2.0
 
@@ -460,28 +402,28 @@ def compute_score(article: Article) -> float:
 
 
 # ------------------------------
-# FETCH DE LINKS
+# BLOCKLIST (URL institucionais/hubs)
 # ------------------------------
 
-MAX_ARTICLES_PER_SOURCE = 3
-
-# URLs que não queremos NUNCA (conteúdo antigo / branded / institucional repetido)
 URL_BLACKLIST_SUBSTR = [
-    # Medicina S/A branded / antigos que voltam sempre
-    "medicinasa.com.br/conexa-assefaz",
-    "medicinasa.com.br/conexa-edi31",
-    "medicinasa.com.br/unip-longevidade",
-    "medicinasa.com.br/noa-notes",
-    "medicinasa.com.br/noa-notes-recursos",
-
-    # Saúde Digital News institucional “receba…”
+    # Saúde Digital News institucional repetido
     "saudedigitalnews.com.br/receba",
 
-    # O Globo “tudo sobre / assunto”
+    # hubs / tags
     "oglobo.globo.com/tudo-sobre/",
+    "/tudo-sobre/",
+    "/assunto/",
+    "/tag/",
+    "/tags/",
+
+    # Medicina S/A branded/evergreen (do seu feedback)
+    "medicinasa.com.br/conexa-edi",
+    "medicinasa.com.br/unip-longevidade",
+    "medicinasa.com.br/conexa-assefaz",
+    "medicinasa.com.br/noa-notes",
+    "medicinasa.com.br/noa-notes-recursos",
 ]
 
-# Palavras de URL que quase sempre significam página institucional/tag/categoria
 URL_BLOCKLIST_KEYWORDS = [
     "receba",
     "assine",
@@ -493,14 +435,28 @@ URL_BLOCKLIST_KEYWORDS = [
     "/sobre",
 ]
 
+BLOCKED_DOMAINS_SUBSTR = [
+    "folha.uol.com.br/equilibrio",
+    "folha.uol.com.br/equilibrioesaude",
+]
+
 
 def is_blacklisted_url(url: str) -> bool:
     u = (url or "").lower()
-    if any(pattern in u for pattern in URL_BLACKLIST_SUBSTR):
+    if any(d in u for d in BLOCKED_DOMAINS_SUBSTR):
+        return True
+    if any(p in u for p in URL_BLACKLIST_SUBSTR):
         return True
     if any(k in u for k in URL_BLOCKLIST_KEYWORDS):
         return True
     return False
+
+
+# ------------------------------
+# LINK EXTRACTION
+# ------------------------------
+
+MAX_ARTICLES_PER_SOURCE = 3
 
 
 class LinkExtractor(HTMLParser):
@@ -525,7 +481,7 @@ class LinkExtractor(HTMLParser):
 
     def handle_data(self, data):
         if self.current_href:
-            self.current_text_parts.append(data.strip())
+            self.current_text_parts.append((data or "").strip())
 
     def handle_endtag(self, tag):
         if tag == "a" and self.current_href:
@@ -553,14 +509,15 @@ def fetch_articles_from_source(source: Source) -> List[Article]:
     seen_urls = set()
     base_domain = extract_domain(source.base_url)
 
+    # ✅ Ajuste pedido: Brasil D-2; outras seções D-1
+    max_days = 2 if source.section == SECTION_BRASIL else 1
+
     for link in parser.links:
         if len(articles) >= MAX_ARTICLES_PER_SOURCE:
             break
 
-        href_raw = link["href"]
+        href = normalize_amp_url(link["href"])
         text = link["text"]
-
-        href = normalize_amp_url(href_raw)
 
         if not href.startswith(base_domain):
             continue
@@ -571,15 +528,14 @@ def fetch_articles_from_source(source: Source) -> List[Article]:
         if is_blacklisted_url(href):
             continue
 
-        title = re.sub(r"\s+", " ", text).strip()
+        title = re.sub(r"\s+", " ", (text or "")).strip()
         if len(title) < 25:
             continue
 
         if not is_relevant(title):
             continue
 
-        # Filtro D-1 (título/URL +, se necessário, página da matéria)
-        if not is_recent_with_article_fetch(title, href, max_days=1):
+        if not is_recent_with_article_fetch(title, href, max_days=max_days):
             continue
 
         seen_urls.add(href)
@@ -616,10 +572,6 @@ def fetch_all_articles() -> List[Article]:
 
 
 def group_articles_by_section(articles: List[Article]) -> Dict[str, List[Article]]:
-    """
-    Agrupa por seção com trava global de URL:
-    - mesma matéria NUNCA aparece em duas seções (evita repetição Mundo/Healthtechs).
-    """
     grouped: Dict[str, List[Article]] = {
         SECTION_BRASIL: [],
         SECTION_MUNDO: [],
@@ -637,29 +589,21 @@ def group_articles_by_section(articles: List[Article]) -> Dict[str, List[Article
             continue
         seen_urls.add(art.url)
 
-        if art.section not in grouped:
-            grouped[art.section] = []
-        grouped[art.section].append(art)
+        grouped.setdefault(art.section, []).append(art)
 
-    # Limite de segurança por seção
     for sec in grouped:
         grouped[sec] = grouped[sec][:20]
 
     return grouped
 
 
-def get_top_n(articles: List[Article], n: int = 5) -> List[Article]:
-    return sorted(articles, key=lambda a: a.score, reverse=True)[:n]
-
-
 def fetch_all_news() -> Dict[str, List[Article]]:
     articles = fetch_all_articles()
-    sections = group_articles_by_section(articles)
-    return sections
+    return group_articles_by_section(articles)
 
 
 if __name__ == "__main__":
     arts = fetch_all_articles()
     print(f"Total de artigos relevantes: {len(arts)}")
-    for a in get_top_n(arts, 10):
+    for a in arts[:10]:
         print(f"- ({a.section}) [{a.score:.1f}] {a.title} -> {a.url}")
