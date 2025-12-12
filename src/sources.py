@@ -32,11 +32,7 @@ BRASIL_SOURCES: List[Source] = [
         base_url="https://grupomidia.com/healthcare/",
         section=SECTION_BRASIL,
     ),
-    Source(
-        name="Folha – Equilíbrio e Saúde",
-        base_url="https://www1.folha.uol.com.br/equilibrioesaude/",
-        section=SECTION_BRASIL,
-    ),
+    # REMOVIDO: Folha – Equilíbrio e Saúde
     Source(
         name="O Globo – Saúde",
         base_url="https://oglobo.globo.com/saude/",
