@@ -32,7 +32,6 @@ BRASIL_SOURCES: List[Source] = [
         base_url="https://grupomidia.com/healthcare/",
         section=SECTION_BRASIL,
     ),
-    # REMOVIDO: Folha – Equilíbrio e Saúde
     Source(
         name="O Globo – Saúde",
         base_url="https://oglobo.globo.com/saude/",
@@ -44,7 +43,6 @@ BRASIL_SOURCES: List[Source] = [
         section=SECTION_BRASIL,
     ),
 ]
-
 
 MUNDO_SOURCES: List[Source] = [
     Source(
@@ -79,7 +77,6 @@ MUNDO_SOURCES: List[Source] = [
     ),
 ]
 
-
 HEALTHTECH_SOURCES: List[Source] = [
     Source(
         name="MobiHealthNews",
@@ -101,13 +98,13 @@ HEALTHTECH_SOURCES: List[Source] = [
         base_url="https://www.fiercehealthcare.com/payers",
         section=SECTION_HEALTHTECHS,
     ),
+    # ✅ NOVA FONTE (pedido): Future Health
     Source(
-        name="STAT News – AI/Digital",
-        base_url="https://www.statnews.com/",
+        name="Future Health – Healthtechs",
+        base_url="https://futurehealth.cc/healthtech/",
         section=SECTION_HEALTHTECHS,
     ),
 ]
-
 
 WELLNESS_SOURCES: List[Source] = [
     Source(
@@ -131,7 +128,6 @@ WELLNESS_SOURCES: List[Source] = [
         section=SECTION_WELLNESS,
     ),
 ]
-
 
 sources_by_section: Dict[str, List[Source]] = {
     SECTION_BRASIL: BRASIL_SOURCES,
