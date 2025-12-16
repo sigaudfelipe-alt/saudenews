@@ -15,16 +15,21 @@ SECTION_WELLNESS = "Wellness – EUA / Europa"
 
 
 # =========================
-# MODELO DE ARTIGO (fica aqui para evitar circular import)
+# MODELO DE ARTIGO (compatível com render_news.py)
 # =========================
 
 @dataclass
 class Article:
     title: str
     url: str
-    source: str
+    source_name: str
     section: str
     score: float = 0.0
+
+    @property
+    def source(self) -> str:
+        # alias pra compatibilidade com código novo
+        return self.source_name
 
 
 # =========================
@@ -51,7 +56,7 @@ class Source:
                 Article(
                     title=title,
                     url=link,
-                    source=self.name,
+                    source_name=self.name,
                     section=self.section,
                 )
             )
