@@ -1,8 +1,8 @@
+from __future__ import annotations
+
 from dataclasses import dataclass
 from typing import List, Dict
 import feedparser
-
-from news_fetcher import Article
 
 # =========================
 # SEÇÕES
@@ -12,6 +12,19 @@ SECTION_BRASIL = "Brasil – Saúde & Operadoras"
 SECTION_MUNDO = "Mundo – Saúde Global"
 SECTION_HEALTHTECHS = "Healthtechs – Brasil & Mundo"
 SECTION_WELLNESS = "Wellness – EUA / Europa"
+
+
+# =========================
+# MODELO DE ARTIGO (fica aqui para evitar circular import)
+# =========================
+
+@dataclass
+class Article:
+    title: str
+    url: str
+    source: str
+    section: str
+    score: float = 0.0
 
 
 # =========================
@@ -28,14 +41,16 @@ class Source:
         feed = feedparser.parse(self.rss)
         articles: List[Article] = []
 
-        for e in feed.entries:
-            if not hasattr(e, "title") or not hasattr(e, "link"):
+        for e in getattr(feed, "entries", []):
+            title = getattr(e, "title", None)
+            link = getattr(e, "link", None)
+            if not title or not link:
                 continue
 
             articles.append(
                 Article(
-                    title=e.title,
-                    url=e.link,
+                    title=title,
+                    url=link,
                     source=self.name,
                     section=self.section,
                 )
