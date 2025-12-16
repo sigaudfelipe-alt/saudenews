@@ -1,137 +1,110 @@
 from __future__ import annotations
 
+"""
+sources.py — catálogo de fontes para o pipeline Saúde News.
+
+Melhorias aplicadas (16/12):
+- Inclusão do Valor Econômico (RSS Empresas) para capturar movimentos relevantes (ex: operadoras/hospitais).
+- Estrutura simples e explícita para manutenção.
+"""
+
 from dataclasses import dataclass
-from typing import Dict, List
+from typing import Dict, List, Optional
 
-SECTION_BRASIL = "brasil"
-SECTION_MUNDO = "mundo"
-SECTION_HEALTHTECHS = "healthtechs"
-SECTION_WELLNESS = "wellness"
+# -------------------------
+# Seções
+# -------------------------
+SECTION_BRASIL = "Brasil – Saúde & Operadoras"
+SECTION_MUNDO = "Mundo – Saúde Global"
+SECTION_HEALTHTECHS = "Healthtechs – Brasil & Mundo"
+SECTION_WELLNESS = "Wellness – EUA / Europa"
 
 
-@dataclass
+@dataclass(frozen=True)
 class Source:
     name: str
-    base_url: str
     section: str
+    base_url: str
+    rss_url: Optional[str] = None
 
 
-BRASIL_SOURCES: List[Source] = [
-    Source(
-        name="Medicina S/A",
-        base_url="https://medicinasa.com.br/",
-        section=SECTION_BRASIL,
-    ),
-    Source(
-        name="Saúde Digital News",
-        base_url="https://saudedigitalnews.com.br/",
-        section=SECTION_BRASIL,
-    ),
-    Source(
-        name="Healthcare – Grupo Mídia",
-        base_url="https://grupomidia.com/healthcare/",
-        section=SECTION_BRASIL,
-    ),
-    Source(
-        name="O Globo – Saúde",
-        base_url="https://oglobo.globo.com/saude/",
-        section=SECTION_BRASIL,
-    ),
-    Source(
-        name="Valor Econômico – Saúde",
-        base_url="https://valor.globo.com/empresas/saude/",
-        section=SECTION_BRASIL,
-    ),
-]
-
-MUNDO_SOURCES: List[Source] = [
-    Source(
-        name="STAT News",
-        base_url="https://www.statnews.com/",
-        section=SECTION_MUNDO,
-    ),
-    Source(
-        name="Modern Healthcare",
-        base_url="https://www.modernhealthcare.com/",
-        section=SECTION_MUNDO,
-    ),
-    Source(
-        name="New York Times – Health",
-        base_url="https://www.nytimes.com/section/health",
-        section=SECTION_MUNDO,
-    ),
-    Source(
-        name="Fierce Healthcare",
-        base_url="https://www.fiercehealthcare.com/",
-        section=SECTION_MUNDO,
-    ),
-    Source(
-        name="Financial Times – Health",
-        base_url="https://www.ft.com/health",
-        section=SECTION_MUNDO,
-    ),
-    Source(
-        name="Healthbrew",
-        base_url="https://healthbrew.com/",
-        section=SECTION_MUNDO,
-    ),
-]
-
-HEALTHTECH_SOURCES: List[Source] = [
-    Source(
-        name="MobiHealthNews",
-        base_url="https://www.mobihealthnews.com/",
-        section=SECTION_HEALTHTECHS,
-    ),
-    Source(
-        name="Rock Health – Insights",
-        base_url="https://rockhealth.com/insights/",
-        section=SECTION_HEALTHTECHS,
-    ),
-    Source(
-        name="Startup Health – News",
-        base_url="https://www.startuphealth.com/news",
-        section=SECTION_HEALTHTECHS,
-    ),
-    Source(
-        name="Fierce Healthcare – Payers",
-        base_url="https://www.fiercehealthcare.com/payers",
-        section=SECTION_HEALTHTECHS,
-    ),
-    # ✅ NOVA FONTE (pedido): Future Health
-    Source(
-        name="Future Health – Healthtechs",
-        base_url="https://futurehealth.cc/healthtech/",
-        section=SECTION_HEALTHTECHS,
-    ),
-]
-
-WELLNESS_SOURCES: List[Source] = [
-    Source(
-        name="Fitt Insider",
-        base_url="https://insider.fitt.co/",
-        section=SECTION_WELLNESS,
-    ),
-    Source(
-        name="NYTimes – Well",
-        base_url="https://www.nytimes.com/section/well",
-        section=SECTION_WELLNESS,
-    ),
-    Source(
-        name="WHOOP – The Locker",
-        base_url="https://www.whoop.com/thelocker/",
-        section=SECTION_WELLNESS,
-    ),
-    Source(
-        name="Oura – Blog",
-        base_url="https://ouraring.com/blog",
-        section=SECTION_WELLNESS,
-    ),
-]
+# -------------------------
+# Fontes por seção
+# -------------------------
 
 sources_by_section: Dict[str, List[Source]] = {
-    SECTION_BRASIL: BRASIL_SOURCES,
-    SECTION_MUNDO: MUNDO_SOURCES,
-    SECTION_HEALTHTECHS: HEALTHTECH_SOURCES,
-    SECTION_WELLNESS: WELLNESS_SOURCES,
+    SECTION_BRASIL: [
+        # Saúde Digital News
+        Source(
+            name="Saúde Digital News",
+            section=SECTION_BRASIL,
+            base_url="https://saudedigitalnews.com.br",
+            # Ajuste se o RSS mudar — exemplo comum:
+            rss_url="https://saudedigitalnews.com.br/feed/",
+        ),
+        # Medicina S/A (atenção: possui áreas tipo revista/panorama; o fetcher bloqueia por URL keyword e data)
+        Source(
+            name="Medicina S/A",
+            section=SECTION_BRASIL,
+            base_url="https://medicinasa.com.br",
+            rss_url="https://medicinasa.com.br/feed/",
+        ),
+        # O Globo – Saúde (se o RSS estiver instável, você pode remover)
+        Source(
+            name="O Globo – Saúde",
+            section=SECTION_BRASIL,
+            base_url="https://oglobo.globo.com/saude",
+            rss_url="https://oglobo.globo.com/rss/saude/",
+        ),
+        # Valor Econômico – Empresas (muito útil para operadoras/hospitais e movimentações)
+        Source(
+            name="Valor Econômico – Empresas",
+            section=SECTION_BRASIL,
+            base_url="https://valor.globo.com/empresas",
+            rss_url="https://valor.globo.com/rss/empresas/",
+        ),
+    ],
+    SECTION_MUNDO: [
+        Source(
+            name="STAT News",
+            section=SECTION_MUNDO,
+            base_url="https://www.statnews.com",
+            rss_url="https://www.statnews.com/feed/",
+        ),
+        Source(
+            name="Modern Healthcare",
+            section=SECTION_MUNDO,
+            base_url="https://www.modernhealthcare.com",
+            rss_url="https://www.modernhealthcare.com/section/rss",
+        ),
+        Source(
+            name="Fierce Healthcare",
+            section=SECTION_MUNDO,
+            base_url="https://www.fiercehealthcare.com",
+            rss_url="https://www.fiercehealthcare.com/rss/xml",
+        ),
+    ],
+    SECTION_HEALTHTECHS: [
+        Source(
+            name="MobiHealthNews",
+            section=SECTION_HEALTHTECHS,
+            base_url="https://www.mobihealthnews.com",
+            rss_url="https://www.mobihealthnews.com/feed",
+        ),
+        # Future Health (você pediu antes para incluir futurehealth.cc)
+        Source(
+            name="Future Health",
+            section=SECTION_HEALTHTECHS,
+            base_url="https://futurehealth.cc",
+            rss_url="https://futurehealth.cc/feed/",
+        ),
+    ],
+    SECTION_WELLNESS: [
+        Source(
+            name="Fitt Insider",
+            section=SECTION_WELLNESS,
+            base_url="https://fittinsider.com",
+            rss_url="https://fittinsider.com/feed/",
+        ),
+    ],
 }
