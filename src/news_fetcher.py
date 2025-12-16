@@ -11,11 +11,7 @@ from sources import Article, sources_by_section
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
-# =========================
-# CONFIGURAÇÕES GLOBAIS
-# =========================
-
-MAX_DAYS_OLD = 2  # D-1/D-2
+MAX_DAYS_OLD = 2
 
 URL_BLOCKLIST_KEYWORDS = [
     "newsletter",
@@ -58,7 +54,6 @@ POSITIVE_KEYWORDS = [
     "clínica",
 ]
 
-# 🔒 REGRA FIXA — se mencionar, não cai por “irrelevante”
 STRATEGIC_ENTITIES = [
     "conexa",
     "unimed",
@@ -70,9 +65,6 @@ STRATEGIC_ENTITIES = [
     "hcor",
 ]
 
-# =========================
-# HELPERS
-# =========================
 
 def normalize_title(title: str) -> str:
     return re.sub(r"\W+", "", title.lower())
@@ -90,11 +82,8 @@ def contains_negative_terms(title: str) -> bool:
 
 def is_relevant(title: str) -> bool:
     t = title.lower()
-
-    # regra fixa
     if any(e in t for e in STRATEGIC_ENTITIES):
         return True
-
     return any(k in t for k in POSITIVE_KEYWORDS)
 
 
@@ -123,26 +112,25 @@ def is_recent(article: Article) -> bool:
 
         date = extract_date_from_text(html)
         if not date:
-            logger.info(f"[DESCARTE][SEM DATA] {article.source} | {article.title}")
+            logger.info(f"[DESCARTE][SEM DATA] {article.source_name} | {article.title}")
             return False
 
         if date < datetime.now() - timedelta(days=MAX_DAYS_OLD):
-            logger.info(f"[DESCARTE][ANTIGA {date.date()}] {article.source} | {article.title}")
+            logger.info(
+                f"[DESCARTE][ANTIGA {date.date()}] {article.source_name} | {article.title}"
+            )
             return False
 
         return True
     except Exception as e:
-        logger.info(f"[DESCARTE][ERRO DATA] {article.source} | {article.title} | {e}")
+        logger.info(
+            f"[DESCARTE][ERRO DATA] {article.source_name} | {article.title} | {e}"
+        )
         return False
 
 
-# =========================
-# MAIN
-# =========================
-
 def fetch_all_news() -> Dict[str, List[Article]]:
     results: Dict[str, List[Article]] = {}
-
     seen_urls = set()
     seen_titles = set()
 
@@ -159,21 +147,20 @@ def fetch_all_news() -> Dict[str, List[Article]]:
             for a in articles:
                 norm_title = normalize_title(a.title)
 
-                # dedupe por URL + título
                 if a.url in seen_urls or norm_title in seen_titles:
-                    logger.info(f"[DESCARTE][DUPLICADA] {a.source} | {a.title}")
+                    logger.info(f"[DESCARTE][DUPLICADA] {a.source_name} | {a.title}")
                     continue
 
                 if is_blocked_url(a.url):
-                    logger.info(f"[DESCARTE][URL BLOCK] {a.source} | {a.title}")
+                    logger.info(f"[DESCARTE][URL BLOCK] {a.source_name} | {a.title}")
                     continue
 
                 if contains_negative_terms(a.title):
-                    logger.info(f"[DESCARTE][NEGATIVA] {a.source} | {a.title}")
+                    logger.info(f"[DESCARTE][NEGATIVA] {a.source_name} | {a.title}")
                     continue
 
                 if not is_relevant(a.title):
-                    logger.info(f"[DESCARTE][IRRELEVANTE] {a.source} | {a.title}")
+                    logger.info(f"[DESCARTE][IRRELEVANTE] {a.source_name} | {a.title}")
                     continue
 
                 if not is_recent(a):
